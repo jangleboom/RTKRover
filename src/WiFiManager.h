@@ -1,143 +1,53 @@
 #ifndef WIFI_MANAGER_H
 #define WIFI_MANAGER_H
+
 #include <Arduino.h>
-// /*
-//  * Function to handle unknown URLs
-//  */
-// void handleNotFound() {
-//   String message = "File Not Found\n\n";
-//   message += "URI: ";
-//   message += server.uri();
-//   message += "\nMethod: ";
-//   message += (server.method() == HTTP_GET) ? "GET" : "POST";
-//   message += "\nArguments: ";
-//   message += server.args();
-//   message += "\n";
-//   for (uint8_t i = 0; i < server.args(); i++) {
-//     message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-//   }
-//   server.send(404, "text/plain", message);
-// }
+#include "EEPROM.h"
+#include "HTML.h"
+#include <WebServer.h>
 
-// /*
-//  * Function for writing WiFi creds to EEPROM
-//  * Returns: true if save successful, false if unsuccessful
-//  */
-// bool writeToMemory(String ssid, String pass) {
-//   char buff1[30];
-//   char buff2[30];
-//   ssid.toCharArray(buff1,30);
-//   pass.toCharArray(buff2,30); 
-//   EEPROM.writeString(100,buff1);
-//   EEPROM.writeString(200,buff2);
-//   delay(100);
-//   String s = EEPROM.readString(100);
-//   String p = EEPROM.readString(200);
-//   //#if DEBUG
-//   Serial.println("Stored SSID, password, are: ");
-//   Serial.print("SSID: ");
-//   Serial.println(s);
-//   Serial.print("PW: ");
-//   Serial.println(p);
-//   //#endif
-//   if (ssid == s && pass == p) {
-//     return true;  
-//   } else {
-//     return false;
-//   }
-// }
+#define SSID_ADDR 100
+#define KEY_ADDR 200
+#define END_ADDR 400
+
+/**
+ * @brief Function to handle unknown URLs
+ */
+void handleNotFound();
+
+/**
+ * @brief Function for writing WiFi creds to EEPROM
+ * @return true if save successful, false if unsuccessful
+ */
+bool writeToMemory(String ssid, String pass);
 
 
-// /*
-//  * Function for handling form
-//  */
-// void handleSubmit() {
-//   String response_success="<h1>Success</h1>";
-//   response_success +="<h2>Device will restart in 3 seconds</h2>";
+/**
+ * @brief Function for handling form
+ */
+void handleSubmit();
 
-//   String response_error="<h1>Error</h1>";
-//   response_error +="<h2><a href='/'>Go back</a>to try again";
-  
-//   if (writeToMemory(String(server.arg("ssid")),String(server.arg("password")))) {
-//      server.send(200, "text/html", response_success);
-//      EEPROM.commit();
-//      delay(3000);
-//      ESP.restart();
-//   } else {
-//      server.send(200, "text/html", response_error);
-//   }
-// }
+/**
+ * @brief Function for home page
+ */
+void handleRoot();
 
-// /*
-//  * Function for home page
-//  */
-// void handleRoot() {
-//   if (server.hasArg("ssid")&& server.hasArg("password")) {
-//     handleSubmit();
-//   }
-//   else {
-//     server.send(200, "text/html", INDEX_HTML);
-//   }
-// }
+/**
+ * @brief Function for loading form
+ * @return false if no WiFi creds in EEPROM
+ */
+bool loadWIFICredsForm();
 
-// /*
-//  * Function for loading form
-//  * Returns: false if no WiFi creds in EEPROM
-//  */
-// bool loadWIFICredsForm() {
-//   String s = EEPROM.readString(100);
-//   String p = EEPROM.readString(200);
-  
-//   const char* ssid     = "RWAHT_WiFi_Manager";
-//   const char* password = "12345678";
+/**
+ * @brief Function checking WiFi creds in memory 
+ * @return: true if not empty, false if empty
+ */
+bool CheckWIFICreds();
 
-//   Serial.println("Setting Access Point...");
-  
-//   WiFi.softAP(ssid, password);
-  
-//   IPAddress IP = WiFi.softAPIP();
-  
-//   Serial.print("AP IP address: ");
-//   Serial.println(IP);
-  
-//   server.on("/", handleRoot);
-
-//   server.onNotFound(handleNotFound);
-
-//   server.begin();
-  
-//   Serial.println("HTTP server started");
- 
-//   while (s.length() <= 0 || p.length() <= 0) {
-//     server.handleClient();
-//     delay(1000);
-//     Serial.println("…");
-//   }
-  
-//   return false;
-// }
-
-// /*
-//  * Function checking WiFi creds in memory 
-//  * Returns: true if not empty, false if empty
-//  */
-// bool CheckWIFICreds() {
-//   Serial.println("Checking WIFI credentials");
-//   String s = EEPROM.readString(100);
-//   String p = EEPROM.readString(200);
-//   //#if DEBUG
-//   Serial.println("Found credentials in EEPROM!");
-//   Serial.print("SSID: ");
-//   Serial.println(s);
-//   Serial.print("PW: ");
-//   Serial.println(p);
-//   delay(5000);
-//   //#endif
-//   if (s.length() > 0 && p.length() > 0) {
-//     return true;
-//   } else {
-//     return false;
-//   }
-// }
+/**
+ * @brief Wipes out the stored WIFI credentials from EEPROM
+ * 
+ */
+void wipeEEPROM();
 
 #endif /* WIFI_MANAGER_H */ 
