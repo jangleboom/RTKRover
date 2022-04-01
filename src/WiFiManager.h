@@ -21,7 +21,6 @@ void handleNotFound();
  */
 bool writeToMemory(String ssid, String pass);
 
-
 /**
  * @brief Function for handling form
  */

@@ -7,8 +7,6 @@
 #define BAUD 115200
 
 
-
-
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(WIFI_CRED_RESET_PIN, INPUT); //for resetting WiFi creds
