@@ -3,10 +3,16 @@
  * @file main.cpp
  * @authors Markus Hädrich && Thomas Resch 
  * <br>
- * @brief This is part of a distributed software, here: head tracker and GNNS positioning
- * using Sparkfun Real Time Kinematics
+ * @brief This is part of a distributed software, here: head tracker and GNNS 
+ * positioning using Sparkfun Real Time Kinematics
  * <br>
  * @todo  - a lot
+ * @note How to handle Wifi: Push the button, join the AP thats appearing 
+ * SSID: "RWAHT_WiFi_Manager", PW: "12345678", open 192.168.4.1 in your browser 
+ * and set credentials you are using for you personal access point on your 
+ * smartphone. If the process is done, the LED turns off and the device reboots.
+ * If there are no Wifi credentials stored in the EEPROM, the LED turns on and the 
+ * device will jump in this mode by itself after startup.
  */
 
 #include "WiFiManager.h"
@@ -34,16 +40,6 @@ Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 void buttonHandler(Button2 &btn);
 
 
-void buttonHandler(Button2 &btn) {
-  if (btn == button) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println("button clicked");
-    DEBUG_SERIAL.println("Wiping WiFi credentials from memory...");
-    wipeEEPROM();
-    while (loadWIFICredsForm()) {};
-  }
-}
-
 void setup() {
   Serial.begin(BAUD);
   while (!Serial) {};
@@ -61,13 +57,15 @@ void setup() {
 
 void loop() {
   button.loop();
-  // if(digitalRead(BUTTON_PIN) == HIGH) {
-  //   Serial.println("Wiping WiFi credentials from memory...");
-  //   wipeEEPROM();
-  //   while (loadWIFICredsForm());
-  // }
-  // digitalWrite(LED_BUILTIN,HIGH);
-  // delay(DELAY_MS);
-  // digitalWrite(LED_BUILTIN,LOW);
-  // delay(DELAY_MS);
+}
+
+
+void buttonHandler(Button2 &btn) {
+  if (btn == button) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    DEBUG_SERIAL.println("button clicked");
+    DEBUG_SERIAL.println("Wiping WiFi credentials from memory...");
+    wipeEEPROM();
+    while (loadWIFICredsForm()) {};
+  }
 }
