@@ -16,6 +16,7 @@
 #define WIFI_MANAGER_H
 
 #include <Arduino.h>
+#include "config.h"
 #include "EEPROM.h"
 #include "HTML.h"
 #include <WebServer.h>

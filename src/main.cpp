@@ -16,19 +16,9 @@
  */
 
 #include "WiFiManager.h"
-
-const int DELAY_MS = 1000;
-
-/******************************************************************************/
-//                        Serial settings
-/******************************************************************************/
-//set to true for debug output, false for no debug output
-#define DEBUGGING true 
-#define DEBUG_SERIAL \
-  if (DEBUGGING) Serial
-
-const int BAUD = 115200;
-
+#ifdef DEBUGGING
+#include "tests.h"
+#endif
 /******************************************************************************/
 //                                Button(s)
 /******************************************************************************/
@@ -39,10 +29,12 @@ Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
 
-
 void setup() {
+  #ifdef DEBUGGING
   Serial.begin(BAUD);
   while (!Serial) {};
+  #endif
+
   EEPROM.begin(400);
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
@@ -50,12 +42,16 @@ void setup() {
 
   if (!CheckWIFICreds()) {
     digitalWrite(LED_BUILTIN, HIGH);
-    Serial.println("No WIFI credentials stored in memory. Loading form...");
+    DEBUG_SERIAL.println(F("No WIFI credentials stored in memory. Loading form..."));
     while (loadWIFICredsForm());
   }
 }
 
 void loop() {
+  #ifdef DEBUGGING
+  aunit::TestRunner::run();
+  #endif
+
   button.loop();
 }
 
@@ -63,8 +59,7 @@ void loop() {
 void buttonHandler(Button2 &btn) {
   if (btn == button) {
     digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println("button clicked");
-    DEBUG_SERIAL.println("Wiping WiFi credentials from memory...");
+    DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
     wipeEEPROM();
     while (loadWIFICredsForm()) {};
   }
