@@ -5,3 +5,5 @@
 .vscode/ipch
 .DS_Store
 .o
+.a
+.elf
