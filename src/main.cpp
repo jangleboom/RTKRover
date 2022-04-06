@@ -6,7 +6,8 @@
  * @brief This is part of a distributed software, here: head tracker and GNNS 
  * positioning using Sparkfun Real Time Kinematics
  * <br>
- * @todo  - a lot
+ * @todo  - FREE RTOS or Zephyr
+ *        
  * @note How to handle Wifi: Push the button, join the AP thats appearing 
  * SSID: "RWAHT_WiFi_Manager", PW: "12345678", open 192.168.4.1 in your browser 
  * and set credentials you are using for you personal access point on your 
@@ -22,9 +23,9 @@
 #include "utility/imumaths.h"
 #include <BLEDevice.h>
 #include <BLE2902.h>
-#include <WiFi.h>
-#include <WiFiUdp.h>
-#include <OSCMessage.h>
+// #include <WiFi.h>
+// #include <WiFiUdp.h>
+// #include <OSCMessage.h>
 #include "sdkconfig.h"
 //#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
 
@@ -37,15 +38,15 @@ long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox m
 #define SERVICE_UUID          "713D0000-503E-4C75-BA94-3148F18D941E"
 #define CHARACTERISTIC_UUID   "713D0002-503E-4C75-BA94-3148F18D941E"
 
-enum dataFormat 
-{
-    stringFormat, // current format
-    byteFormat,
-    oscFormat,
-    customFormat  
-};
+// enum dataFormat 
+// {
+//     stringFormat, // current format
+//     byteFormat,
+//     oscFormat,
+//     customFormat  
+// };
 
-WiFiUDP udp;
+// WiFiUDP udp;
 
 const char ssid[] = "OSPW";
 const char password[] = "12OSPW3456";
@@ -80,7 +81,7 @@ int roll_degrees = 0;
 int lastRoll_degrees = -10;
 int lastSteps = -1;
     
-dataFormat currentDataFormat = oscFormat;
+// dataFormat currentDataFormat = oscFormat;
 BLECharacteristic *pCharacteristicTracking;
 
 // Deactivate brown out detection
@@ -131,37 +132,6 @@ class MyServerCallbacks: public BLEServerCallbacks
 };
 
 
-void WiFiEvent(WiFiEvent_t event) //wifi event handler
-{
-    switch(event) {
-      case SYSTEM_EVENT_STA_GOT_IP:
-          //When connected set 
-          Serial.print("WiFi connected! IP address: ");
-          Serial.println(WiFi.localIP());  
-          //initializes the UDP state
-          //This initializes the transfer buffer
-          udp.begin(WiFi.localIP(), PORTNUMBER);
-          wifiConnected = true;
-          break;
-      case SYSTEM_EVENT_STA_DISCONNECTED:
-          Serial.println("WiFi lost connection");
-          wifiConnected = false;
-          break;
-      default: break;
-    }
-}
-
-void setupWifi(void)
-{
-    Serial.println("Connecting to WiFi network: " + String(ssid));
-
-    WiFi.disconnect(true);   // delete old config
-    //register event handler
-    WiFi.onEvent(WiFiEvent);
-    WiFi.begin(ssid, password);
-    Serial.println("Waiting for WIFI connection...");
-}
-
 void setupBLE(void)
 {
     BLEDevice::init(deviceName.c_str());
@@ -197,25 +167,25 @@ void setupBNO080(void)
  
 
 
-void sendOscInt(IPAddress& address, char *adress, int value) 
-{
-    OSCMessage msg(adress);
-    msg.add((int)value);
-    udp.beginPacket(address, PORTNUMBER); 
-    msg.send(udp);
-    udp.endPacket();
-    msg.empty();
-}
+// void sendOscInt(IPAddress& address, char *adress, int value) 
+// {
+//     OSCMessage msg(adress);
+//     msg.add((int)value);
+//     udp.beginPacket(address, PORTNUMBER); 
+//     msg.send(udp);
+//     udp.endPacket();
+//     msg.empty();
+// }
 
-void sendOscFloat(IPAddress& address, char *adress, float value) 
-{
-    OSCMessage msg(adress);
-    msg.add((float)value);
-    udp.beginPacket(address, PORTNUMBER); 
-    msg.send(udp);
-    udp.endPacket();
-    msg.empty();
-}
+// void sendOscFloat(IPAddress& address, char *adress, float value) 
+// {
+//     OSCMessage msg(adress);
+//     msg.add((float)value);
+//     udp.beginPacket(address, PORTNUMBER); 
+//     msg.send(udp);
+//     udp.endPacket();
+//     msg.empty();
+// }
     
 
 
@@ -257,12 +227,7 @@ void setup() {
   Wire.begin();
   Wire.setClock(400000); //Increase I2C data rate to 400kHz
 
-  if (withWifi)
-      setupWifi();
-
-  if (withBle)
-      setupBLE();
-
+  setupBLE(); 
   setupBNO080();               
   
   batVoltage = 0.002 * analogRead(BAT_PIN);
@@ -321,26 +286,26 @@ void loop() {
             Serial.println(dataStr);         
         }
         
-        if(withWifi && wifiConnected) // WIFE SENDS SINGLE VALUE OSC MESSAGES
-        {
-            if(abs(lastYaw_degrees - yaw_degrees) >= 2)
-            {             
-                sendOscInt(ipAdress, "/azi", yaw_degrees); 
-                lastYaw_degrees = yaw_degrees;  
-            }
+        // if(withWifi && wifiConnected) // WIFE SENDS SINGLE VALUE OSC MESSAGES
+        // {
+        //     if(abs(lastYaw_degrees - yaw_degrees) >= 2)
+        //     {             
+        //         sendOscInt(ipAdress, "/azi", yaw_degrees); 
+        //         lastYaw_degrees = yaw_degrees;  
+        //     }
 
-            if(abs(lastPitch_degrees - pitch_degrees) >= 2)
-            {             
-                sendOscInt(ipAdress, "/ele", pitch_degrees); 
-                lastPitch_degrees = pitch_degrees;  
-            }  
+        //     if(abs(lastPitch_degrees - pitch_degrees) >= 2)
+        //     {             
+        //         sendOscInt(ipAdress, "/ele", pitch_degrees); 
+        //         lastPitch_degrees = pitch_degrees;  
+        //     }  
 
-            if(abs(lastRoll_degrees - roll_degrees) >= 2)
-            {             
-                sendOscInt(ipAdress, "/roll", roll_degrees); 
-                lastRoll_degrees = roll_degrees;  
-            } 
-        }      
+        //     if(abs(lastRoll_degrees - roll_degrees) >= 2)
+        //     {             
+        //         sendOscInt(ipAdress, "/roll", roll_degrees); 
+        //         lastRoll_degrees = roll_degrees;  
+        //     } 
+        // }      
     } 
 
     delay(10); // Maybee reduce delay time?
