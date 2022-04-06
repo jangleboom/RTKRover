@@ -16,9 +16,9 @@
 #define WIFI_MANAGER_H
 
 #include <Arduino.h>
-#include "config.h"
+#include "rwaht_rtk_config.h"
 #include "EEPROM.h"
-#include "HTML.h"
+#include "html.h"
 #include <WebServer.h>
 
 #define SSID_ADDR 100

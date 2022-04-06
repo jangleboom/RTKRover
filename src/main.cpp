@@ -1,20 +1,26 @@
 
-/**
+/*******************************************************************************
  * @file main.cpp
  * @authors Markus Hädrich && Thomas Resch 
  * <br>
- * @brief This is part of a distributed software, here: head tracker and GNNS 
- * positioning using Sparkfun Real Time Kinematics
+ * @brief This is part of a distributed software, here: head tracker and GNSS 
+ *        positioning using Sparkfun Real Time Kinematics
  * <br>
  * @todo  - FREE RTOS or Zephyr
  *        
- * @note How to handle Wifi: Push the button, join the AP thats appearing 
- * SSID: "RWAHT_WiFi_Manager", PW: "12345678", open 192.168.4.1 in your browser 
- * and set credentials you are using for you personal access point on your 
- * smartphone. If the process is done, the LED turns off and the device reboots.
- * If there are no Wifi credentials stored in the EEPROM, the LED turns on and the 
- * device will jump in this mode by itself after startup.
- */
+ * @note How to handle Wifi: 
+ *        - Push the button 
+ *        - Join the AP thats appearing 
+ *            -# SSID: e. g. "RWAHT_WiFi_Manager" 
+ *            -# PW: e. g. "12345678"
+ *        - Open address 192.168.4.1 in your browser and set credentials you are 
+ *          using for you personal access point on your smartphone
+ *        - If the process is done, the LED turns off and the device reboots
+ *        - If there are no Wifi credentials stored in the EEPROM, the device 
+ *          will jump in this mode on startup
+ * 
+ * @version 0.43
+ ******************************************************************************/
 
 
 #include <Arduino.h>
@@ -23,49 +29,24 @@
 #include "utility/imumaths.h"
 #include <BLEDevice.h>
 #include <BLE2902.h>
-// #include <WiFi.h>
-// #include <WiFiUdp.h>
-// #include <OSCMessage.h>
 #include "sdkconfig.h"
-//#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
+#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
+#include "rwaht_rtk_config.h"
 
-//SFE_UBLOX_GPS myGPS;
+String deviceName = DEVICE_NAME;
+
+SFE_UBLOX_GPS myGPS;
 
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 
-#define BUF_LEN 20
-#define PORTNUMBER 30009  // use last two digits for headtracker id
-#define SERVICE_UUID          "713D0000-503E-4C75-BA94-3148F18D941E"
-#define CHARACTERISTIC_UUID   "713D0002-503E-4C75-BA94-3148F18D941E"
+BNO080 bno080;
+byte byteBuffer[PAYLOAD_BUF_LEN];
+char charBuffer[PAYLOAD_BUF_LEN] = {0x00};
 
-// enum dataFormat 
-// {
-//     stringFormat, // current format
-//     byteFormat,
-//     oscFormat,
-//     customFormat  
-// };
-
-// WiFiUDP udp;
-
-const char ssid[] = "OSPW";
-const char password[] = "12OSPW3456";
-const char *udpAddress = "192.168.43.205";
-IPAddress ipAdress(192,168,43,205);
-
-BNO080 bno080;//test
-byte byteBuffer[BUF_LEN];
-char charBuffer[BUF_LEN] = {0x00};
-String deviceName = "rwaht84";
-const int LED_PIN = 4;  // Show BLE connection status
 const int BAT_PIN = A13; // Messure half the battery voltage
-float batVoltage = 0;  
+float batVoltage = 0.;  
 
-bool withSerial = true;
-bool withBle = true;
-bool withWifi = false;
 bool bleConnected = false;
-bool wifiConnected = false;
 bool sendYaw = true;
 bool sendPitch = true;
 bool sendRoll = false;
@@ -80,14 +61,10 @@ int lastPitch_degrees = -400;
 int roll_degrees = 0;
 int lastRoll_degrees = -10;
 int lastSteps = -1;
-    
-// dataFormat currentDataFormat = oscFormat;
-BLECharacteristic *pCharacteristicTracking;
 
-// Deactivate brown out detection
-#undef ESP_ERROR_CHECK
-#define ESP_ERROR_CHECK(x)   do { esp_err_t rc = (x); if (rc != ESP_OK) { ESP_LOGE("err", "esp_err_t = %d", rc); assert(0 && #x);} } while(0);
-//=============================================
+/******************************************************************************/
+//                                Bluetooth LE
+/******************************************************************************/
 
 class MyCharacteristicCallbacks: public BLECharacteristicCallbacks 
 {
@@ -131,72 +108,20 @@ class MyServerCallbacks: public BLEServerCallbacks
     }
 };
 
+BLECharacteristic *pCharacteristicTracking;
 
-void setupBLE(void)
-{
-    BLEDevice::init(deviceName.c_str());
-    BLEServer *pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new MyServerCallbacks()); 
-    BLEService *pService = pServer->createService(SERVICE_UUID);
-  
-    pCharacteristicTracking = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
-                                         BLECharacteristic::PROPERTY_READ   |
-                                         BLECharacteristic::PROPERTY_WRITE  |
-                                         BLECharacteristic::PROPERTY_NOTIFY |
-                                         BLECharacteristic::PROPERTY_INDICATE
-                                       );
+void setupBLE(void);
 
-    pCharacteristicTracking->addDescriptor(new BLE2902());
-    pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
-    pCharacteristicTracking->setValue(deviceName.c_str());
-    pService->start();
-    BLEAdvertising *pAdvertising = pServer->getAdvertising();
-    pAdvertising->start();  
-}
-
-void setupBNO080(void)
-{
-    bno080.begin(); // Activate IMU functionalities
-    //bno080.calibrateAll();
-    bno080.enableRotationVector(20);       
-    bno080.enableLinearAccelerometer(20);    
-   // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht..  
-    delay(1000);     // why? 
-}
- 
-
-
-// void sendOscInt(IPAddress& address, char *adress, int value) 
-// {
-//     OSCMessage msg(adress);
-//     msg.add((int)value);
-//     udp.beginPacket(address, PORTNUMBER); 
-//     msg.send(udp);
-//     udp.endPacket();
-//     msg.empty();
-// }
-
-// void sendOscFloat(IPAddress& address, char *adress, float value) 
-// {
-//     OSCMessage msg(adress);
-//     msg.add((float)value);
-//     udp.beginPacket(address, PORTNUMBER); 
-//     msg.send(udp);
-//     udp.endPacket();
-//     msg.empty();
-// }
-    
-
-
-
-
-
+/******************************************************************************/
+//                                BNO080
+/******************************************************************************/
+void setupBNO080(void);
 
 #include "WiFiManager.h"
-// #ifdef DEBUGGING
-// #include "tests.h"
-// #endif
+#ifdef DEBUGGING
+#include "tests.h"
+#endif
+
 /******************************************************************************/
 //                                Button(s)
 /******************************************************************************/
@@ -236,9 +161,9 @@ void setup() {
 }
 
 void loop() {
-  // #ifdef DEBUGGING
-  // aunit::TestRunner::run();
-  // #endif
+  #ifdef DEBUGGING
+  aunit::TestRunner::run();
+  #endif
 
   button.loop();
 
@@ -271,41 +196,18 @@ void loop() {
         lin_accel_z_f = 0.0;
         lin_accel_z_f = bno080.getLinAccelZ(); // float   
 
-        unsigned int steps = 0;
+        // unsigned int steps = 0;
  
-        if(withBle && bleConnected) // BLE IS RWA STRING FORMAT FOR NOW
-        {          
-            String yaw_degrees_str, pitch_degrees_str, lin_accel_z_str, step_str, dataStr;
-            yaw_degrees_str = String(yaw_degrees);
-            pitch_degrees_str = String(pitch_degrees);
-            lin_accel_z_str = String(lin_accel_z_f);
-            step_str = String(steps);
-            dataStr = yaw_degrees_str + " " + pitch_degrees_str + " " + lin_accel_z_str + " " + step_str;
-            pCharacteristicTracking->setValue(dataStr.c_str());
-            pCharacteristicTracking->notify();
-            Serial.println(dataStr);         
-        }
-        
-        // if(withWifi && wifiConnected) // WIFE SENDS SINGLE VALUE OSC MESSAGES
-        // {
-        //     if(abs(lastYaw_degrees - yaw_degrees) >= 2)
-        //     {             
-        //         sendOscInt(ipAdress, "/azi", yaw_degrees); 
-        //         lastYaw_degrees = yaw_degrees;  
-        //     }
-
-        //     if(abs(lastPitch_degrees - pitch_degrees) >= 2)
-        //     {             
-        //         sendOscInt(ipAdress, "/ele", pitch_degrees); 
-        //         lastPitch_degrees = pitch_degrees;  
-        //     }  
-
-        //     if(abs(lastRoll_degrees - roll_degrees) >= 2)
-        //     {             
-        //         sendOscInt(ipAdress, "/roll", roll_degrees); 
-        //         lastRoll_degrees = roll_degrees;  
-        //     } 
-        // }      
+        String yaw_degrees_str, pitch_degrees_str, lin_accel_z_str, dataStr; //step_str, ;
+        yaw_degrees_str = String(yaw_degrees);
+        pitch_degrees_str = String(pitch_degrees);
+        lin_accel_z_str = String(lin_accel_z_f);
+        // step_str = String(steps);
+        // TODO: dataStr St
+        dataStr = yaw_degrees_str + " " + pitch_degrees_str + " " + lin_accel_z_str; //+ " " + step_str;
+        pCharacteristicTracking->setValue(dataStr.c_str());
+        pCharacteristicTracking->notify();
+        Serial.println(dataStr);           
     } 
 
     delay(10); // Maybee reduce delay time?
@@ -319,4 +221,45 @@ void buttonHandler(Button2 &btn) {
     wipeEEPROM();
     while (loadWIFICredsForm()) {};
   }
+}
+
+
+void setupBLE(void)
+{
+    BLEDevice::init(deviceName.c_str());
+    BLEServer *pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks()); 
+    BLEService *pService = pServer->createService(SERVICE_UUID);
+  
+    pCharacteristicTracking = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID,
+                                        //  BLECharacteristic::PROPERTY_READ   |
+                                        //  BLECharacteristic::PROPERTY_WRITE  |
+                                        //  BLECharacteristic::PROPERTY_INDICATE |
+                                         BLECharacteristic::PROPERTY_NOTIFY 
+                                         
+                                       );
+
+    pCharacteristicTracking->addDescriptor(new BLE2902());
+    pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
+    pCharacteristicTracking->setValue(deviceName.c_str());
+    pService->start();
+    BLEAdvertising *pAdvertising = pServer->getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+    pAdvertising->setMinPreferred(0x12);  // 0x06 x 1.25 ms = 7.5 ms, functions that help with iPhone connections issue
+    pAdvertising->setMaxPreferred(0x24);  // 30 ms
+    //pAdvertising->start();
+    BLEDevice::startAdvertising();
+    Serial.println("Characteristic defined! Now you can read it in your phone!");
+}
+
+void setupBNO080(void)
+{
+    bno080.begin(); // Activate IMU functionalities
+    //bno080.calibrateAll();
+    bno080.enableRotationVector(20);       
+    bno080.enableLinearAccelerometer(20);    
+   // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht..  
+    delay(1000);     // why? 
 }
