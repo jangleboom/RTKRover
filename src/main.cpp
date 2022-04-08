@@ -166,7 +166,8 @@ void setup() {
   
   batVoltage = 0.002 * analogRead(BAT_PIN);
   DEBUG_SERIAL.print("Battery: ");
-  DEBUG_SERIAL.println(batVoltage);  // TODO: Buzzer peep tone while low power 
+  DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
+  DEBUG_SERIAL.println(" V");
 }
 
 void loop() {
@@ -241,7 +242,7 @@ void setupBLE(void)
     BLEService *pService = pServer->createService(SERVICE_UUID);
   
     pCharacteristicTracking = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID,
+                                         CHARACTERISTIC_UUID_NOTIFY,
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
