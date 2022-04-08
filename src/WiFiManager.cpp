@@ -67,13 +67,17 @@ void handleRoot() {
   }
 }
 
+
+
 bool loadWIFICredsForm() {
   String s = EEPROM.readString(SSID_ADDR);
   String p = EEPROM.readString(KEY_ADDR);
   
   Serial.println(F("Setting Access Point..."));
-  
-  WiFi.softAP(DEFAULT_SSID, DEFAULT_KEY);
+  String ssidAP = getDeviceName(DEVICE_TYPE);
+  DEBUG_SERIAL.print("ssidAP: ");
+  DEBUG_SERIAL.println(ssidAP);
+  WiFi.softAP(ssidAP.c_str(), DEFAULT_KEY);
   
   IPAddress IP = WiFi.softAPIP();
   

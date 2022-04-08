@@ -16,7 +16,7 @@
 #define WIFI_MANAGER_H
 
 #include <Arduino.h>
-#include "rwaht_rtk_config.h"
+#include "htrtk_config.h"
 #include "EEPROM.h"
 #include "html.h"
 #include <WebServer.h>

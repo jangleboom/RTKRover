@@ -11,7 +11,7 @@
  * @note How to handle Wifi: 
  *        - Push the button 
  *        - Join the AP thats appearing 
- *            -# SSID: e. g. "RWAHT_WiFi_Manager" 
+ *            -# SSID: e. g. "HTRTK_" + ChipID 
  *            -# PW: e. g. "12345678"
  *        - Open address 192.168.4.1 in your browser and set credentials you are 
  *          using for you personal access point on your smartphone
@@ -31,9 +31,10 @@
 #include <BLE2902.h>
 #include "sdkconfig.h"
 #include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
-#include "rwaht_rtk_config.h"
+#include "htrtk_config.h"
 
-String deviceName = DEVICE_NAME;
+
+String deviceName = getDeviceName(DEVICE_TYPE);
 
 SFE_UBLOX_GPS myGPS;
 
@@ -74,24 +75,28 @@ class MyCharacteristicCallbacks: public BLECharacteristicCallbacks
 
         if (value.length() > 0) 
         {
-            Serial.println("*********");
-            Serial.print("New value: ");
+            DEBUG_SERIAL.println("*********");
+            DEBUG_SERIAL.print("New value: ");
             for (int i = 0; i < value.length(); i++)
-                Serial.print(value[i]);
+                DEBUG_SERIAL.print(value[i]);
 
-            Serial.println();
-            Serial.println("*********");
+            DEBUG_SERIAL.println();
+            DEBUG_SERIAL.println("*********");
         }
      }
 
      void onConnect(BLEServer* pServer) 
      {
         bleConnected = true;
+        DEBUG_SERIAL.print("bleConnected: ");
+        DEBUG_SERIAL.println(bleConnected);
      };
 
     void onDisconnect(BLEServer* pServer) 
     {
         bleConnected = false;
+        DEBUG_SERIAL.print("bleConnected: ");
+        DEBUG_SERIAL.println(bleConnected);
     }
 };
 
@@ -100,11 +105,13 @@ class MyServerCallbacks: public BLEServerCallbacks
     void onConnect(BLEServer* pServer) 
     {
         bleConnected = true;
+        BLEDevice::stopAdvertising();
     };
 
     void onDisconnect(BLEServer* pServer) 
     {
         bleConnected = false;
+        BLEDevice::startAdvertising();
     }
 };
 
@@ -142,6 +149,8 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here
+  DEBUG_SERIAL.print("deviceName: ");
+  DEBUG_SERIAL.println(deviceName);
 
   if (!CheckWIFICreds()) {
     digitalWrite(LED_BUILTIN, HIGH);
@@ -156,8 +165,8 @@ void setup() {
   setupBNO080();               
   
   batVoltage = 0.002 * analogRead(BAT_PIN);
-  Serial.print("Battery: ");
-  Serial.print(batVoltage);  // TODO: Buzzer peep tone while low power 
+  DEBUG_SERIAL.print("Battery: ");
+  DEBUG_SERIAL.println(batVoltage);  // TODO: Buzzer peep tone while low power 
 }
 
 void loop() {
@@ -207,7 +216,7 @@ void loop() {
         dataStr = yaw_degrees_str + " " + pitch_degrees_str + " " + lin_accel_z_str; //+ " " + step_str;
         pCharacteristicTracking->setValue(dataStr.c_str());
         pCharacteristicTracking->notify();
-        Serial.println(dataStr);           
+        // DEBUG_SERIAL.println(dataStr);           
     } 
 
     delay(10); // Maybee reduce delay time?
@@ -251,7 +260,7 @@ void setupBLE(void)
     pAdvertising->setMaxPreferred(0x24);  // 30 ms
     //pAdvertising->start();
     BLEDevice::startAdvertising();
-    Serial.println("Characteristic defined! Now you can read it in your phone!");
+    DEBUG_SERIAL.println("Characteristic defined! Now you can read it in your phone!");
 }
 
 void setupBNO080(void)
