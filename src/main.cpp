@@ -176,8 +176,8 @@ void loop() {
   #endif
 
   button.loop();
-
-  if (bno080.dataAvailable() == true)       // TODO: Separate getting values from sending values
+    // TODO: Separate reading values from sending values
+  if (bno080.dataAvailable() && bleConnected)
     {
         float quatI = bno080.getQuatI();
         float quatJ = bno080.getQuatJ();
@@ -190,17 +190,17 @@ void loop() {
         imu::Vector<3> q_to_euler = quat.toEuler();     
         yaw_degrees_f = q_to_euler.x();
         yaw_degrees_f = yaw_degrees_f * -180.0 / M_PI; // conversion to degrees
-        if( yaw_degrees_f < 0 ) 
+        if ( yaw_degrees_f < 0 ) 
             yaw_degrees_f += 360.0; // convert negative to positive angles
       
         yaw_degrees = (int)(round(yaw_degrees_f));  
          
         pitch_degrees_f = q_to_euler.z();
-        pitch_degrees_f = pitch_degrees_f * -180.0/ M_PI;
+        pitch_degrees_f = pitch_degrees_f * -180.0 / M_PI;
         pitch_degrees = (int)(round(pitch_degrees_f));
 
         roll_degrees_f = q_to_euler.y();
-        roll_degrees_f = roll_degrees_f * -180.0/ M_PI;
+        roll_degrees_f = roll_degrees_f * -180.0 / M_PI;
         roll_degrees = (int)(round(roll_degrees_f));
 
         lin_accel_z_f = 0.0;
@@ -213,12 +213,14 @@ void loop() {
         pitch_degrees_str = String(pitch_degrees);
         lin_accel_z_str = String(lin_accel_z_f);
         // step_str = String(steps);
-        // TODO: dataStr St
         dataStr = yaw_degrees_str + " " + pitch_degrees_str + " " + lin_accel_z_str; //+ " " + step_str;
         pCharacteristicTracking->setValue(dataStr.c_str());
         pCharacteristicTracking->notify();
         // DEBUG_SERIAL.println(dataStr);           
-    } 
+    } else {
+        DEBUG_SERIAL.println(F("Waiting for data or BLE connection"));
+        delay(1000);
+    }
 
     delay(10); // Maybee reduce delay time?
 }
