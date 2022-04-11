@@ -55,13 +55,10 @@ bool sendLinAccX = false;
 bool sendLinAccY = false;
 bool sendLinAccZ = false;
 
-int yaw_degrees = 0;
-int lastYaw_degrees = -10;
-int pitch_degrees = 0;
-int lastPitch_degrees = -400;
-int roll_degrees = 0;
-int lastRoll_degrees = -10;
-int lastSteps = -1;
+// int yawDegrees = 0;
+// int pitchDegrees = 0;
+// int rollDegrees = 0;
+// float linAccelZF = 0.0;
 
 /******************************************************************************/
 //                                Bluetooth LE
@@ -174,6 +171,19 @@ void setup() {
     DEBUG_SERIAL.print(F("Battery: "));
     DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
     DEBUG_SERIAL.println(" V");
+
+    // String oneStr = "1234567890";
+    // DEBUG_SERIAL.print("bytes oneStr: ");
+    // DEBUG_SERIAL.println(oneStr.length());
+    // String twoStr((char *)0); 
+    // twoStr.reserve(20);
+    // DEBUG_SERIAL.print("bytes twoStr: ");
+    // DEBUG_SERIAL.println(twoStr.length());
+    // twoStr = oneStr;
+    // DEBUG_SERIAL.print("bytes twoStr: ");
+    // DEBUG_SERIAL.println(twoStr.length());
+    // while(1) {};
+
     }
 
 void loop() {
@@ -193,34 +203,34 @@ void loop() {
             float quatJ = bno080.getQuatJ();
             float quatK = bno080.getQuatK();
             float quatReal = bno080.getQuatReal();          
-            float yaw_degrees_f, pitch_degrees_f, roll_degrees_f, lin_accel_z_f;           
+            float yawDegreesF, pitchDegreesF, linAccelZF;// rollDegreesF;
+            int pitchDegrees, yawDegrees;//, rollDegrees;         
 
             imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
             quat.normalize();
             imu::Vector<3> q_to_euler = quat.toEuler();     
-            yaw_degrees_f = q_to_euler.x();
-            yaw_degrees_f = yaw_degrees_f * -180.0 / M_PI; // conversion to degrees
-            if ( yaw_degrees_f < 0 ) 
-                yaw_degrees_f += 360.0; // convert negative to positive angles
+            yawDegreesF = q_to_euler.x();
+            yawDegreesF = yawDegreesF * -180.0 / M_PI; // conversion to degrees
+            if ( yawDegreesF < 0 ) 
+                yawDegreesF += 360.0; // convert negative to positive angles
         
-            yaw_degrees = (int)(round(yaw_degrees_f));  
+            yawDegrees = (int)(round(yawDegreesF));  
             
-            pitch_degrees_f = q_to_euler.z();
-            pitch_degrees_f = pitch_degrees_f * -180.0 / M_PI;
-            pitch_degrees = (int)(round(pitch_degrees_f));
+            pitchDegreesF = q_to_euler.z();
+            pitchDegreesF = pitchDegreesF * -180.0 / M_PI;
+            pitchDegrees = (int)(round(pitchDegreesF));
 
-            roll_degrees_f = q_to_euler.y();
-            roll_degrees_f = roll_degrees_f * -180.0 / M_PI;
-            roll_degrees = (int)(round(roll_degrees_f));
+            // rollDegreesF = q_to_euler.y();
+            // rollDegreesF = rollDegreesF * -180.0 / M_PI;
+            // rollDegrees = (int)(round(rollDegreesF));
 
-            lin_accel_z_f = 0.0;
-            lin_accel_z_f = bno080.getLinAccelZ(); // float   
+            linAccelZF = bno080.getLinAccelZ(); 
 
-            // unsigned int steps = 0;
             String dataStr((char *)0);
-            dataStr.reserve(9 + LIN_ACCEL_Z_DECIMAL_DIGITS + 1);
-            dataStr = String(yaw_degrees) + DATA_STR_DELIMITER + String(pitch_degrees) \
-                    + DATA_STR_DELIMITER + String(lin_accel_z_f, LIN_ACCEL_Z_DECIMAL_DIGITS);
+            // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
+            dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
+            dataStr = String(yawDegrees) + DATA_STR_DELIMITER + String(pitchDegrees) \
+                    + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
             pCharacteristicTracking->setValue(dataStr.c_str());
             pCharacteristicTracking->notify();
             DEBUG_SERIAL.println(dataStr);           
