@@ -135,7 +135,7 @@ void setupBNO080(void);
 //                                Button(s)
 /******************************************************************************/
 #include "Button2.h"
-// Button to press to wipe out stored wifi credentials
+// Button to press to wipe out stored WiFi credentials
 const int BUTTON_PIN = 15;
 Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 
@@ -151,7 +151,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
   button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here
-  DEBUG_SERIAL.print("deviceName: ");
+  DEBUG_SERIAL.print(F("deviceName: "));
   DEBUG_SERIAL.println(deviceName);
 
   if (!CheckWIFICreds()) {
@@ -167,7 +167,7 @@ void setup() {
   setupBNO080();               
   
   batVoltage = 0.002 * analogRead(BAT_PIN);
-  DEBUG_SERIAL.print("Battery: ");
+  DEBUG_SERIAL.print(F("Battery: "));
   DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
   DEBUG_SERIAL.println(" V");
 }
@@ -182,7 +182,7 @@ void loop() {
 
   button.loop();
     // TODO: Separate reading values from sending values
-  if (bno080.dataAvailable() && bleConnected)
+  if (bleConnected && bno080.dataAvailable())
     {
         float quatI = bno080.getQuatI();
         float quatJ = bno080.getQuatJ();
@@ -224,14 +224,14 @@ void loop() {
         // DEBUG_SERIAL.println(dataStr);           
     } else {
         DEBUG_SERIAL.println(F("Waiting for data or BLE connection"));
-        delay(1000);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
     }
-
-    delay(10); // Maybee reduce delay time?
+    vTaskDelay(10/portTICK_PERIOD_MS);
 }
 
 
-void buttonHandler(Button2 &btn) {
+void buttonHandler(Button2 &btn) 
+{
   if (btn == button) {
     digitalWrite(LED_BUILTIN, HIGH);
     DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
@@ -268,7 +268,7 @@ void setupBLE(void)
     pAdvertising->setMaxPreferred(0x24);  // 30 ms
     //pAdvertising->start();
     BLEDevice::startAdvertising();
-    DEBUG_SERIAL.println("Characteristic defined! Now you can read it in your phone!");
+    DEBUG_SERIAL.println(F("Characteristic defined! Now you can read it in your phone!"));
 }
 
 void setupBNO080(void)
@@ -278,5 +278,4 @@ void setupBNO080(void)
     bno080.enableRotationVector(20);       
     bno080.enableLinearAccelerometer(20);    
    // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht..  
-    delay(1000);     // why? 
 }
