@@ -55,9 +55,9 @@ bool sendLinAccX = false;
 bool sendLinAccY = false;
 bool sendLinAccZ = false;
 
-// int yawDegrees = 0;
-// int pitchDegrees = 0;
-// int rollDegrees = 0;
+// int yawDegree = 0;
+// int pitchDegree = 0;
+// int rollDegree = 0;
 // float linAccelZF = 0.0;
 
 /******************************************************************************/
@@ -198,42 +198,41 @@ void loop() {
 
     // TODO: Separate reading values from sending values
     if (bleConnected && bno080.dataAvailable())
-        {
-            float quatI = bno080.getQuatI();
-            float quatJ = bno080.getQuatJ();
-            float quatK = bno080.getQuatK();
-            float quatReal = bno080.getQuatReal();          
-            float yawDegreesF, pitchDegreesF, linAccelZF;// rollDegreesF;
-            int pitchDegrees, yawDegrees;//, rollDegrees;         
+        {         
+            float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
+            int pitchDegree, yawDegree;// rollDegree;
+            
+            quatI = bno080.getQuatI();
+            quatJ = bno080.getQuatJ();
+            quatK = bno080.getQuatK();
+            quatReal = bno080.getQuatReal();       
 
             imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
             quat.normalize();
             imu::Vector<3> q_to_euler = quat.toEuler();     
-            yawDegreesF = q_to_euler.x();
-            yawDegreesF = yawDegreesF * -180.0 / M_PI; // conversion to degrees
-            if ( yawDegreesF < 0 ) 
-                yawDegreesF += 360.0; // convert negative to positive angles
+            yawDegreeF = q_to_euler.x();
+            yawDegreeF = yawDegreeF * -180.0 / M_PI;   // conversion to Degree
+            if ( yawDegreeF < 0 ) yawDegreeF += 359.0; // convert negative to positive angles
+            yawDegree = (int)(round(yawDegreeF));  
         
-            yawDegrees = (int)(round(yawDegreesF));  
-            
-            pitchDegreesF = q_to_euler.z();
-            pitchDegreesF = pitchDegreesF * -180.0 / M_PI;
-            pitchDegrees = (int)(round(pitchDegreesF));
+            pitchDegreeF = q_to_euler.z();
+            pitchDegreeF = pitchDegreeF * -180.0 / M_PI;
+            pitchDegree = (int)(round(pitchDegreeF));
 
-            // rollDegreesF = q_to_euler.y();
-            // rollDegreesF = rollDegreesF * -180.0 / M_PI;
-            // rollDegrees = (int)(round(rollDegreesF));
+            // rollDegreeF = q_to_euler.y();
+            // rollDegreeF = rollDegreeF * -180.0 / M_PI;
+            // rollDegree = (int)(round(rollDegreeF));
 
             linAccelZF = bno080.getLinAccelZ(); 
 
             String dataStr((char *)0);
             // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
             dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
-            dataStr = String(yawDegrees) + DATA_STR_DELIMITER + String(pitchDegrees) \
+            dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
                     + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
             pCharacteristicTracking->setValue(dataStr.c_str());
             pCharacteristicTracking->notify();
-            DEBUG_SERIAL.println(dataStr);           
+            DEBUG_SERIAL.print(dataStr);      
         } else {
             DEBUG_SERIAL.println(F("Waiting for data or BLE connection"));
             vTaskDelay(1000/portTICK_PERIOD_MS);
