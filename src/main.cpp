@@ -75,27 +75,27 @@ class MyCharacteristicCallbacks: public BLECharacteristicCallbacks
 
         if (value.length() > 0) 
         {
-            DEBUG_SERIAL.println("*********");
-            DEBUG_SERIAL.print("New value: ");
+            DEBUG_SERIAL.println(F("*********"));
+            DEBUG_SERIAL.print(F("New value: "));
             for (int i = 0; i < value.length(); i++)
                 DEBUG_SERIAL.print(value[i]);
 
             DEBUG_SERIAL.println();
-            DEBUG_SERIAL.println("*********");
+            DEBUG_SERIAL.println(F("*********"));
         }
      }
 
      void onConnect(BLEServer* pServer) 
      {
         bleConnected = true;
-        DEBUG_SERIAL.print("bleConnected: ");
+        DEBUG_SERIAL.print(F("bleConnected: "));
         DEBUG_SERIAL.println(bleConnected);
      };
 
     void onDisconnect(BLEServer* pServer) 
     {
         bleConnected = false;
-        DEBUG_SERIAL.print("bleConnected: ");
+        DEBUG_SERIAL.print(("bleConnected: "));
         DEBUG_SERIAL.println(bleConnected);
     }
 };
@@ -142,91 +142,93 @@ Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 void buttonHandler(Button2 &btn);
 
 void setup() {
-  #ifdef DEBUGGING
-  Serial.begin(BAUD);
-  while (!Serial) {};
-  #endif
+    #ifdef DEBUGGING
+    Serial.begin(BAUD);
+    while (!Serial) {};
+    #endif
 
-  EEPROM.begin(400);
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-  button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here
-  DEBUG_SERIAL.print(F("deviceName: "));
-  DEBUG_SERIAL.println(deviceName);
+    DEBUG_SERIAL.print(F("deviceName: "));
+    DEBUG_SERIAL.println(deviceName);
 
-  if (!CheckWIFICreds()) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println(F("No WIFI credentials stored in memory. Loading form..."));
-    while (loadWIFICredsForm());
-  }
+    EEPROM.begin(400);
+    
 
-  Wire.begin();
-  Wire.setClock(400000); //Increase I2C data rate to 400kHz
 
-  setupBLE(); 
-  setupBNO080();               
-  
-  batVoltage = 0.002 * analogRead(BAT_PIN);
-  DEBUG_SERIAL.print(F("Battery: "));
-  DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
-  DEBUG_SERIAL.println(" V");
-}
+    if (!CheckWIFICreds()) {
+        digitalWrite(LED_BUILTIN, HIGH);
+        DEBUG_SERIAL.println(F("No WIFI credentials stored in memory. Loading form..."));
+        while (loadWIFICredsForm());
+    }
+
+    Wire.begin();
+    Wire.setClock(400000); //Increase I2C data rate to 400kHz
+
+    setupBLE(); 
+    setupBNO080();
+    button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, LOW);
+                
+    
+    batVoltage = 0.002 * analogRead(BAT_PIN);
+    DEBUG_SERIAL.print(F("Battery: "));
+    DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
+    DEBUG_SERIAL.println(" V");
+    }
 
 void loop() {
-  #ifdef DEBUGGING
-  #ifdef TESTING
-  DEBUG_SERIAL.println(F("Running Tests..."))
-  aunit::TestRunner::run();
-  #endif
-  #endif
+    #ifdef DEBUGGING
+    #ifdef TESTING
+    DEBUG_SERIAL.println(F("Running Tests..."))
+    aunit::TestRunner::run();
+    #endif
+    #endif
 
-  button.loop();
+    button.loop();
+
     // TODO: Separate reading values from sending values
-  if (bleConnected && bno080.dataAvailable())
-    {
-        float quatI = bno080.getQuatI();
-        float quatJ = bno080.getQuatJ();
-        float quatK = bno080.getQuatK();
-        float quatReal = bno080.getQuatReal();          
-        float yaw_degrees_f, pitch_degrees_f, roll_degrees_f, lin_accel_z_f;           
+    if (bleConnected && bno080.dataAvailable())
+        {
+            float quatI = bno080.getQuatI();
+            float quatJ = bno080.getQuatJ();
+            float quatK = bno080.getQuatK();
+            float quatReal = bno080.getQuatReal();          
+            float yaw_degrees_f, pitch_degrees_f, roll_degrees_f, lin_accel_z_f;           
 
-        imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
-        quat.normalize();
-        imu::Vector<3> q_to_euler = quat.toEuler();     
-        yaw_degrees_f = q_to_euler.x();
-        yaw_degrees_f = yaw_degrees_f * -180.0 / M_PI; // conversion to degrees
-        if ( yaw_degrees_f < 0 ) 
-            yaw_degrees_f += 360.0; // convert negative to positive angles
-      
-        yaw_degrees = (int)(round(yaw_degrees_f));  
-         
-        pitch_degrees_f = q_to_euler.z();
-        pitch_degrees_f = pitch_degrees_f * -180.0 / M_PI;
-        pitch_degrees = (int)(round(pitch_degrees_f));
+            imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
+            quat.normalize();
+            imu::Vector<3> q_to_euler = quat.toEuler();     
+            yaw_degrees_f = q_to_euler.x();
+            yaw_degrees_f = yaw_degrees_f * -180.0 / M_PI; // conversion to degrees
+            if ( yaw_degrees_f < 0 ) 
+                yaw_degrees_f += 360.0; // convert negative to positive angles
+        
+            yaw_degrees = (int)(round(yaw_degrees_f));  
+            
+            pitch_degrees_f = q_to_euler.z();
+            pitch_degrees_f = pitch_degrees_f * -180.0 / M_PI;
+            pitch_degrees = (int)(round(pitch_degrees_f));
 
-        roll_degrees_f = q_to_euler.y();
-        roll_degrees_f = roll_degrees_f * -180.0 / M_PI;
-        roll_degrees = (int)(round(roll_degrees_f));
+            roll_degrees_f = q_to_euler.y();
+            roll_degrees_f = roll_degrees_f * -180.0 / M_PI;
+            roll_degrees = (int)(round(roll_degrees_f));
 
-        lin_accel_z_f = 0.0;
-        lin_accel_z_f = bno080.getLinAccelZ(); // float   
+            lin_accel_z_f = 0.0;
+            lin_accel_z_f = bno080.getLinAccelZ(); // float   
 
-        // unsigned int steps = 0;
- 
-        String yaw_degrees_str, pitch_degrees_str, lin_accel_z_str, dataStr; //step_str, ;
-        yaw_degrees_str = String(yaw_degrees);
-        pitch_degrees_str = String(pitch_degrees);
-        lin_accel_z_str = String(lin_accel_z_f);
-        // step_str = String(steps);
-        dataStr = yaw_degrees_str + " " + pitch_degrees_str + " " + lin_accel_z_str; //+ " " + step_str;
-        pCharacteristicTracking->setValue(dataStr.c_str());
-        pCharacteristicTracking->notify();
-        // DEBUG_SERIAL.println(dataStr);           
-    } else {
-        DEBUG_SERIAL.println(F("Waiting for data or BLE connection"));
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-    }
-    vTaskDelay(10/portTICK_PERIOD_MS);
+            // unsigned int steps = 0;
+            String dataStr((char *)0);
+            dataStr.reserve(9 + LIN_ACCEL_Z_DECIMAL_DIGITS + 1);
+            dataStr = String(yaw_degrees) + DATA_STR_DELIMITER + String(pitch_degrees) \
+                    + DATA_STR_DELIMITER + String(lin_accel_z_f, LIN_ACCEL_Z_DECIMAL_DIGITS);
+            pCharacteristicTracking->setValue(dataStr.c_str());
+            pCharacteristicTracking->notify();
+            DEBUG_SERIAL.println(dataStr);           
+        } else {
+            DEBUG_SERIAL.println(F("Waiting for data or BLE connection"));
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+        }
+        vTaskDelay(10/portTICK_PERIOD_MS);
 }
 
 

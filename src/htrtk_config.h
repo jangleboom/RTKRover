@@ -19,19 +19,21 @@ const int BAUD = 115200;
 /******************************************************************************/
 //                        Default WIFI settings
 /******************************************************************************/
-#define DEVICE_TYPE "HTRTK_"
-#define DEFAULT_KEY "12345678"
+#define DEVICE_TYPE                  "HTRTK_"
+#define DEFAULT_KEY                  "12345678"
 String getDeviceName(const String &);
 uint32_t getChipId(void);
+
 
 
 /******************************************************************************/
 //                        Default BLE settings
 /******************************************************************************/
-#define PAYLOAD_BUF_LEN 20
-#define SERVICE_UUID          "713D0000-503E-4C75-BA94-3148F18D941E"
+#define PAYLOAD_BUF_LEN              20
+#define SERVICE_UUID                 "713D0000-503E-4C75-BA94-3148F18D941E"
 #define CHARACTERISTIC_UUID_NOTIFY   "713D0002-503E-4C75-BA94-3148F18D941E"
-
+#define LIN_ACCEL_Z_DECIMAL_DIGITS   2
+#define DATA_STR_DELIMITER           " "
 /******************************************************************************/
 //                        Help Functions
 /******************************************************************************/
