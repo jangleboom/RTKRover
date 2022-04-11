@@ -126,7 +126,9 @@ void setupBNO080(void);
 
 #include "WiFiManager.h"
 #ifdef DEBUGGING
+#ifdef TESTING
 #include "tests.h"
+#endif
 #endif
 
 /******************************************************************************/
@@ -172,7 +174,10 @@ void setup() {
 
 void loop() {
   #ifdef DEBUGGING
+  #ifdef TESTING
+  DEBUG_SERIAL.println(F("Running Tests..."))
   aunit::TestRunner::run();
+  #endif
   #endif
 
   button.loop();
