@@ -6,7 +6,10 @@
  * @brief This is part of a distributed software, here: head tracker and GNSS 
  *        positioning using Sparkfun Real Time Kinematics
  * <br>
- * @todo  - FREE RTOS or Zephyr
+ * @todo  - FREE RTOS
+ *        - Calibration button (?)
+ *        - Test: BNO080 found/connected
+ *        - Test: BLE 
  *        
  * @note How to handle Wifi: 
  *        - Push the button 
@@ -44,7 +47,7 @@ BNO080 bno080;
 byte byteBuffer[PAYLOAD_BUF_LEN];
 char charBuffer[PAYLOAD_BUF_LEN] = {0x00};
 
-const int BAT_PIN = A13; // Messure half the battery voltage
+const int BAT_PIN = 13; // Messure half the battery voltage
 float batVoltage = 0.;  
 
 bool bleConnected = false;
@@ -138,6 +141,8 @@ Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
 
+String dataStr((char *)0);
+
 void setup() {
     #ifdef DEBUGGING
     Serial.begin(BAUD);
@@ -172,17 +177,20 @@ void setup() {
     DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
     DEBUG_SERIAL.println(" V");
 
-    // String oneStr = "1234567890";
-    // DEBUG_SERIAL.print("bytes oneStr: ");
-    // DEBUG_SERIAL.println(oneStr.length());
-    // String twoStr((char *)0); 
-    // twoStr.reserve(20);
-    // DEBUG_SERIAL.print("bytes twoStr: ");
-    // DEBUG_SERIAL.println(twoStr.length());
-    // twoStr = oneStr;
-    // DEBUG_SERIAL.print("bytes twoStr: ");
-    // DEBUG_SERIAL.println(twoStr.length());
-    // while(1) {};
+    // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
+    dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
+
+    String thisBoard= ARDUINO_BOARD;
+    DEBUG_SERIAL.println(thisBoard);
+    // if (thisBoard.compareTo("Adafruit ESP32 Feather") == 0) {
+    // Serial.println("Compiled for Adafruit ESP32 Feather");
+    // ledPort = 2;
+    // else if (thisBoard.compareTo("SparkFun ESP32 Thing Plus") == 0) {
+    //    ledPort = 13;
+    // } else {
+    // Serial.println("Compiled for another board");
+    // ledPort = 5;
+    // }
 
     }
 
@@ -195,9 +203,12 @@ void loop() {
     #endif
 
     button.loop();
-
+    while (!bleConnected) {
+        DEBUG_SERIAL.println(F("Waiting for BLE connection"));
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+    }
     // TODO: Separate reading values from sending values
-    if (bleConnected && bno080.dataAvailable())
+    if (bno080.dataAvailable())
         {         
             float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
             int pitchDegree, yawDegree;// rollDegree;
@@ -225,16 +236,14 @@ void loop() {
 
             linAccelZF = bno080.getLinAccelZ(); 
 
-            String dataStr((char *)0);
-            // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
-            dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
+            
             dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
                     + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
             pCharacteristicTracking->setValue(dataStr.c_str());
             pCharacteristicTracking->notify();
-            DEBUG_SERIAL.print(dataStr);      
+            // DEBUG_SERIAL.print(dataStr);      
         } else {
-            DEBUG_SERIAL.println(F("Waiting for data or BLE connection"));
+            DEBUG_SERIAL.println(F("Waiting for BNO080 data"));
             vTaskDelay(1000/portTICK_PERIOD_MS);
         }
         vTaskDelay(10/portTICK_PERIOD_MS);
@@ -283,10 +292,10 @@ void setupBLE(void)
 }
 
 void setupBNO080(void)
-{
+{   
     bno080.begin(); // Activate IMU functionalities
     //bno080.calibrateAll();
-    bno080.enableRotationVector(20);       
-    bno080.enableLinearAccelerometer(20);    
-   // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht..  
+    bno080.enableRotationVector(BNO080_UPDATE_RATE_MS);       
+    bno080.enableLinearAccelerometer(BNO080_UPDATE_RATE_MS);    
+    // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht..  
 }

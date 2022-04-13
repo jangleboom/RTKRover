@@ -34,6 +34,11 @@ uint32_t getChipId(void);
 #define CHARACTERISTIC_UUID_NOTIFY   "713D0002-503E-4C75-BA94-3148F18D941E"
 #define LIN_ACCEL_Z_DECIMAL_DIGITS   2
 #define DATA_STR_DELIMITER           " "
+
+/******************************************************************************/
+//                        Default BNO080 settings
+/******************************************************************************/
+#define BNO080_UPDATE_RATE_MS        20 // Time between sensor readings
 /******************************************************************************/
 //                        Help Functions
 /******************************************************************************/
