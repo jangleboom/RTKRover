@@ -34,38 +34,20 @@
 #include <BLE2902.h>
 #include "sdkconfig.h"
 #include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
-#include "htrtk_config.h"
+#include "config.h"
+#include "WiFiManager.h"
 
 
 String deviceName = getDeviceName(DEVICE_TYPE);
 
 SFE_UBLOX_GPS myGPS;
-
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 
-BNO080 bno080;
-byte byteBuffer[PAYLOAD_BUF_LEN];
-char charBuffer[PAYLOAD_BUF_LEN] = {0x00};
-
-const int BAT_PIN = 13; // Messure half the battery voltage
-float batVoltage = 0.;  
-
-bool bleConnected = false;
-bool sendYaw = true;
-bool sendPitch = true;
-bool sendRoll = false;
-bool sendLinAccX = false;
-bool sendLinAccY = false;
-bool sendLinAccZ = false;
-
-// int yawDegree = 0;
-// int pitchDegree = 0;
-// int rollDegree = 0;
-// float linAccelZF = 0.0;
 
 /******************************************************************************/
 //                                Bluetooth LE
 /******************************************************************************/
+float bleConnected = false;
 
 class MyCharacteristicCallbacks: public BLECharacteristicCallbacks 
 {
@@ -116,20 +98,33 @@ class MyServerCallbacks: public BLEServerCallbacks
 };
 
 BLECharacteristic *pCharacteristicTracking;
+String dataStr((char *)0);
 
 void setupBLE(void);
 
 /******************************************************************************/
 //                                BNO080
 /******************************************************************************/
+BNO080 bno080;
+byte byteBuffer[PAYLOAD_BUF_LEN];
+char charBuffer[PAYLOAD_BUF_LEN] = {0x00};
+
+const int BAT_PIN = 13; // Messure half the battery voltage
+
+bool sendYaw = true;
+bool sendPitch = true;
+bool sendRoll = false;
+bool sendLinAccX = false;
+bool sendLinAccY = false;
+bool sendLinAccZ = false;
+
+// int yawDegree = 0;
+// int pitchDegree = 0;
+// int rollDegree = 0;
+// float linAccelZF = 0.0;
+
 void setupBNO080(void);
 
-#include "WiFiManager.h"
-#ifdef DEBUGGING
-#ifdef TESTING
-#include "tests.h"
-#endif
-#endif
 
 /******************************************************************************/
 //                                Button(s)
@@ -140,8 +135,11 @@ const int BUTTON_PIN = 15;
 Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
-
-String dataStr((char *)0);
+float getBatteryVolts(void);
+float getBatteryVolts() {
+    float batteryVolts = 2.0 * analogRead(BAT_PIN) * 3.3 / 4095.0;
+    return batteryVolts;
+}
 
 void setup() {
     #ifdef DEBUGGING
@@ -154,12 +152,10 @@ void setup() {
 
     EEPROM.begin(400);
     
-
-
-    if (!CheckWIFICreds()) {
+    if (!CheckWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
-        DEBUG_SERIAL.println(F("No WIFI credentials stored in memory. Loading form..."));
-        while (loadWIFICredsForm());
+        DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
+        while (loadWiFiCredsForm());
     }
 
     Wire.begin();
@@ -171,10 +167,8 @@ void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
                 
-    
-    batVoltage = 0.002 * analogRead(BAT_PIN);
     DEBUG_SERIAL.print(F("Battery: "));
-    DEBUG_SERIAL.print(batVoltage);  // TODO: Buzzer peep tone while low power
+    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power
     DEBUG_SERIAL.println(" V");
 
     // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
@@ -256,7 +250,7 @@ void buttonHandler(Button2 &btn)
     digitalWrite(LED_BUILTIN, HIGH);
     DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
     wipeEEPROM();
-    while (loadWIFICredsForm()) {};
+    while (loadWiFiCredsForm()) {};
   }
 }
 

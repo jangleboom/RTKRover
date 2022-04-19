@@ -69,7 +69,7 @@ void handleRoot() {
 
 
 
-bool loadWIFICredsForm() {
+bool loadWiFiCredsForm() {
   String s = EEPROM.readString(SSID_ADDR);
   String p = EEPROM.readString(KEY_ADDR);
   
@@ -101,7 +101,7 @@ bool loadWIFICredsForm() {
   return false;
 }
 
-bool CheckWIFICreds() {
+bool CheckWiFiCreds() {
   DEBUG_SERIAL.println(F("Checking WIFI credentials"));
   String s = EEPROM.readString(SSID_ADDR);
   String p = EEPROM.readString(KEY_ADDR);

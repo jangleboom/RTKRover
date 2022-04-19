@@ -16,10 +16,11 @@
 #define WIFI_MANAGER_H
 
 #include <Arduino.h>
-#include "htrtk_config.h"
+#include <WebServer.h>
+#include "config.h"
 #include "EEPROM.h"
 #include "html.h"
-#include <WebServer.h>
+
 
 #define SSID_ADDR 100
 #define KEY_ADDR 200
@@ -50,13 +51,13 @@ void handleRoot();
  * @brief Function for loading form
  * @return false if no WiFi creds in EEPROM
  */
-bool loadWIFICredsForm();
+bool loadWiFiCredsForm();
 
 /**
  * @brief Function checking WiFi creds in memory 
  * @return: true if not empty, false if empty
  */
-bool CheckWIFICreds();
+bool CheckWiFiCreds();
 
 /**
  * @brief Wipes out the stored WIFI credentials from EEPROM

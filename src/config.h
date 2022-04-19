@@ -1,5 +1,5 @@
-#ifndef HTRTK_CONFIG_H
-#define HTRTK_CONFIG_H
+#ifndef CONFIG_H
+#define CONFIG_H
 #include <Arduino.h>
 
 // Deactivate brown out detection
@@ -15,6 +15,12 @@
   if (DEBUGGING) Serial
 
 const int BAUD = 115200;
+
+#ifdef DEBUGGING
+#ifdef TESTING
+#include "tests.h"
+#endif
+#endif
 
 /******************************************************************************/
 //                        Default WIFI settings
