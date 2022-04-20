@@ -144,7 +144,7 @@ void setup() {
     DEBUG_SERIAL.println(deviceName);
 
     EEPROM.begin(400);
-    
+    // wipeEEPROM();
     if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));

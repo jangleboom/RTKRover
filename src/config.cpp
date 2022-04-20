@@ -11,11 +11,18 @@ uint32_t getChipId() {
     return chipId;
 }
 
-String getDeviceName(const String &prefix) {
+String getDeviceName(const String &prefix) 
+{
+  unsigned int prefixLen = prefix.length();
+  unsigned int suffixLen = 6;
+  
   String deviceName((char *)0);
-  unsigned int prefixSize = sizeof(prefix);
-  deviceName.reserve(prefixSize + 7);
-  deviceName = prefix + String(getChipId(), HEX);
+  String suffix = String(getChipId(), HEX);
+  suffix.toUpperCase();
+  
+  deviceName.reserve(prefixLen + suffixLen);
+  deviceName += prefix;
+  deviceName += suffix;
 
   return deviceName;
 }
