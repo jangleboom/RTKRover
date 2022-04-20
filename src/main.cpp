@@ -35,21 +35,18 @@
 
 
 #include <Arduino.h>
-#include <Wire.h>
-#include "SparkFun_BNO080_Arduino_Library.h"
-#include "utility/imumaths.h"
+#include <Wire.h> // BNO080 and uBlox GNSS
 #include <BLEDevice.h>
 #include <BLE2902.h>
+#include <SparkFun_u-blox_GNSS_Arduino_Library.h>
+#include <SparkFun_BNO080_Arduino_Library.h>
+#include "utility/imumaths.h"
 #include "sdkconfig.h"
-#include "SparkFun_Ublox_Arduino_Library.h" //http://librarymanager/All#SparkFun_Ublox_GPS
 #include "config.h"
 #include "WiFiManager.h"
 
 
 String deviceName = getDeviceName(DEVICE_TYPE);
-
-SFE_UBLOX_GPS myGPS;
-long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 
 /*******************************************************************************
  *                                 WiFi
@@ -146,6 +143,17 @@ void buttonHandler(Button2 &btn);
 const int BAT_PIN = 13; 
 float getBatteryVolts(void);
 
+/*******************************************************************************
+ *                                 GNSS
+ * ****************************************************************************/
+long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
+
+SFE_UBLOX_GNSS myGNSS;
+
+void setupGNSS(void);
+void printGNSSData(void);
+
+
 
 void setup() {
     #ifdef DEBUGGING
@@ -174,7 +182,7 @@ void setup() {
 
     Wire.begin();
     Wire.setClock(400000); //Increase I2C data rate to 400kHz
-
+    setupGNSS();
     setupBLE(); 
     setupBNO080();
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
@@ -188,6 +196,7 @@ void setup() {
     DEBUG_SERIAL.print(F("Running on "));
     DEBUG_SERIAL.println(thisBoard);
 }
+
 
 void loop() {
     #ifdef DEBUGGING
@@ -242,7 +251,33 @@ void loop() {
             vTaskDelay(1000/portTICK_PERIOD_MS);
         }
         vTaskDelay(10/portTICK_PERIOD_MS);
+    printGNSSData();
 }
+
+void printGNSSData() {
+    DEBUG_SERIAL.println("\n****\n");
+    myGNSS.checkUblox(); //See if new data is available. Process bytes as they come in.
+    DEBUG_SERIAL.println("\n****\n");
+    vTaskDelay(250); //Don't pound too hard on the I2C bus
+}
+/*******************************************************************************
+ *                                 WiFi
+ * ****************************************************************************/
+
+void setupGNSS() {
+    if (myGNSS.begin() == false) {
+    DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
+    while (1);
+    }
+    
+    myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA); //Set the I2C port to output both NMEA and UBX messages
+    myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
+    //This will pipe all NMEA sentences to the serial port so we can see them
+    #ifdef DEBUGGING
+    myGNSS.setNMEAOutputPort(Serial);
+    #endif
+}
+
 
 /*******************************************************************************
  *                                 WiFi
@@ -307,7 +342,10 @@ void setupBNO080(void)
 }
 
 float getBatteryVolts() {
-    float batteryVolts = 2.0 * analogRead(BAT_PIN) * 3.3 / 4095.0;
+    // Vout = Dout * Vmax / Dmax 
+    // Because battery volts are higher than Vmax, we use the voltage devider on 
+    // Pin A13 (Huzzah ESP32, it may be different on other boards) 
+    float batteryVolts = 2.0 * (analogRead(BAT_PIN) * 3.3 / 4095.0);
     return batteryVolts;
 }
 
