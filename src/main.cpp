@@ -11,7 +11,7 @@
  *        - Test: BNO080 found/connected
  *        - Test: BLE 
  *        
- * @note How to handle Wifi: 
+ * @note How to handle WiFi: 
  *        - Push the button 
  *        - Join the AP thats appearing 
  *            -# SSID: e. g. "HTRTK_" + ChipID 
@@ -21,6 +21,14 @@
  *        - If the process is done, the LED turns off and the device reboots
  *        - If there are no Wifi credentials stored in the EEPROM, the device 
  *          will jump in this mode on startup
+ * 
+ *       How to measure battery:
+ *        - First:  Since the ADC2 module is also used by the Wi-Fi, only one of 
+ *                  them could get the preemption when using together, which means 
+ *                  the adc2_get_raw() may get blocked until Wi-Fi stops, and 
+ *                  vice versa. (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html)
+ *        - Second: Easiest way, use a fuel gauge breakout board e. g. Adafruit_LC709203F
+ *                  Complicated way, implement an alternating usage of WiFi and ADC2
  * 
  * @version 0.43
  ******************************************************************************/
@@ -43,10 +51,15 @@ String deviceName = getDeviceName(DEVICE_TYPE);
 SFE_UBLOX_GPS myGPS;
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 
+/*******************************************************************************
+ *                                 WiFi
+ * ****************************************************************************/
 
-/******************************************************************************/
-//                                Bluetooth LE
-/******************************************************************************/
+void setupWiFi(const String& ssid, const String& key);
+
+/*******************************************************************************
+ *                                 Bluetooth LE
+ * ****************************************************************************/
 float bleConnected = false; // TODO: deglobalize this
 
 class MyCharacteristicCallbacks: public BLECharacteristicCallbacks 
@@ -102,9 +115,9 @@ String dataStr((char *)0);
 
 void setupBLE(void);
 
-/******************************************************************************/
-//                                BNO080
-/******************************************************************************/
+/*******************************************************************************
+ *                                 BNO080
+ * ****************************************************************************/
 bool sendYaw = true;
 bool sendPitch = true;
 bool sendRoll = false;
@@ -116,9 +129,9 @@ void setupBNO080(void);
 
 BNO080 bno080;
 
-/******************************************************************************/
-//                                Button(s)
-/******************************************************************************/
+/*******************************************************************************
+ *                                 Button(s)
+ * ****************************************************************************/
 #include "Button2.h"
 // Button to press to wipe out stored WiFi credentials
 const int BUTTON_PIN = 15;
@@ -126,9 +139,9 @@ Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
 
-/******************************************************************************/
-//                                  Battery
-/******************************************************************************/
+/*******************************************************************************
+ *                                   Battery
+ * ****************************************************************************/
 // Messure half the battery voltage
 const int BAT_PIN = 13; 
 float getBatteryVolts(void);
@@ -140,8 +153,11 @@ void setup() {
     while (!Serial) {};
     #endif
 
-    DEBUG_SERIAL.print(F("deviceName: "));
+    DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
+    DEBUG_SERIAL.print(F("Battery: "));
+    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power
+    DEBUG_SERIAL.println(" V");
 
     EEPROM.begin(400);
     // wipeEEPROM();
@@ -149,7 +165,12 @@ void setup() {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
         while (loadWiFiCredsForm());
-    }
+    }  else {
+    // Then log into WiFi
+    String ssid = EEPROM.readString(SSID_ADDR);
+    String key = EEPROM.readString(KEY_ADDR);
+    setupWiFi(ssid, key);
+  }
 
     Wire.begin();
     Wire.setClock(400000); //Increase I2C data rate to 400kHz
@@ -159,10 +180,6 @@ void setup() {
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
-                
-    DEBUG_SERIAL.print(F("Battery: "));
-    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power
-    DEBUG_SERIAL.println(" V");
 
     // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
     dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
@@ -227,6 +244,28 @@ void loop() {
         vTaskDelay(10/portTICK_PERIOD_MS);
 }
 
+/*******************************************************************************
+ *                                 WiFi
+ * ****************************************************************************/
+
+void setupWiFi(const String& ssid, const String& key) {
+  delay(10);
+  // We start by connecting to a WiFi network
+  DEBUG_SERIAL.println();
+  DEBUG_SERIAL.print("Connecting to ");
+  DEBUG_SERIAL.println(ssid);
+  WiFi.mode(WIFI_STA);
+  WiFi.softAPdisconnect(true);
+  WiFi.begin(ssid.c_str(), key.c_str());
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    DEBUG_SERIAL.print(".");
+  }
+  DEBUG_SERIAL.println("");
+  DEBUG_SERIAL.println("WiFi connected");
+  DEBUG_SERIAL.println("IP address: ");
+  DEBUG_SERIAL.println(WiFi.localIP());
+}
 
 void setupBLE(void)
 {
