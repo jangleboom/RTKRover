@@ -47,7 +47,7 @@ long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox m
 /******************************************************************************/
 //                                Bluetooth LE
 /******************************************************************************/
-float bleConnected = false;
+float bleConnected = false; // TODO: deglobalize this
 
 class MyCharacteristicCallbacks: public BLECharacteristicCallbacks 
 {
@@ -105,12 +105,6 @@ void setupBLE(void);
 /******************************************************************************/
 //                                BNO080
 /******************************************************************************/
-BNO080 bno080;
-byte byteBuffer[PAYLOAD_BUF_LEN];
-char charBuffer[PAYLOAD_BUF_LEN] = {0x00};
-
-const int BAT_PIN = 13; // Messure half the battery voltage
-
 bool sendYaw = true;
 bool sendPitch = true;
 bool sendRoll = false;
@@ -118,13 +112,9 @@ bool sendLinAccX = false;
 bool sendLinAccY = false;
 bool sendLinAccZ = false;
 
-// int yawDegree = 0;
-// int pitchDegree = 0;
-// int rollDegree = 0;
-// float linAccelZF = 0.0;
-
 void setupBNO080(void);
 
+BNO080 bno080;
 
 /******************************************************************************/
 //                                Button(s)
@@ -135,11 +125,14 @@ const int BUTTON_PIN = 15;
 Button2 button = Button2(BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
+
+/******************************************************************************/
+//                                  Battery
+/******************************************************************************/
+// Messure half the battery voltage
+const int BAT_PIN = 13; 
 float getBatteryVolts(void);
-float getBatteryVolts() {
-    float batteryVolts = 2.0 * analogRead(BAT_PIN) * 3.3 / 4095.0;
-    return batteryVolts;
-}
+
 
 void setup() {
     #ifdef DEBUGGING
@@ -152,7 +145,7 @@ void setup() {
 
     EEPROM.begin(400);
     
-    if (!CheckWiFiCreds()) {
+    if (!checkWiFiCreds()) {
         digitalWrite(LED_BUILTIN, HIGH);
         DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
         while (loadWiFiCredsForm());
@@ -175,18 +168,9 @@ void setup() {
     dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
 
     String thisBoard= ARDUINO_BOARD;
+    DEBUG_SERIAL.print(F("Running on "));
     DEBUG_SERIAL.println(thisBoard);
-    // if (thisBoard.compareTo("Adafruit ESP32 Feather") == 0) {
-    // Serial.println("Compiled for Adafruit ESP32 Feather");
-    // ledPort = 2;
-    // else if (thisBoard.compareTo("SparkFun ESP32 Thing Plus") == 0) {
-    //    ledPort = 13;
-    // } else {
-    // Serial.println("Compiled for another board");
-    // ledPort = 5;
-    // }
-
-    }
+}
 
 void loop() {
     #ifdef DEBUGGING
@@ -244,17 +228,6 @@ void loop() {
 }
 
 
-void buttonHandler(Button2 &btn) 
-{
-  if (btn == button) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
-    wipeEEPROM();
-    while (loadWiFiCredsForm()) {};
-  }
-}
-
-
 void setupBLE(void)
 {
     BLEDevice::init(deviceName.c_str());
@@ -292,4 +265,19 @@ void setupBNO080(void)
     bno080.enableRotationVector(BNO080_UPDATE_RATE_MS);       
     bno080.enableLinearAccelerometer(BNO080_UPDATE_RATE_MS);    
     // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht..  
+}
+
+float getBatteryVolts() {
+    float batteryVolts = 2.0 * analogRead(BAT_PIN) * 3.3 / 4095.0;
+    return batteryVolts;
+}
+
+void buttonHandler(Button2 &btn) 
+{
+  if (btn == button) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
+    wipeEEPROM();
+    while (loadWiFiCredsForm()) {};
+  }
 }

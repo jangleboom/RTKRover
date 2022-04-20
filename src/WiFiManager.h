@@ -57,7 +57,7 @@ bool loadWiFiCredsForm();
  * @brief Function checking WiFi creds in memory 
  * @return: true if not empty, false if empty
  */
-bool CheckWiFiCreds();
+bool checkWiFiCreds();
 
 /**
  * @brief Wipes out the stored WIFI credentials from EEPROM

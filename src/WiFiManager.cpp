@@ -18,17 +18,18 @@ void handleNotFound() {
 }
 
 bool writeToMemory(String ssid, String pass) {
-  char buff1[30];
-  char buff2[30];
-  ssid.toCharArray(buff1,30);
-  pass.toCharArray(buff2,30); 
-  EEPROM.writeString(100,buff1);
-  EEPROM.writeString(200,buff2);
+  unsigned int bufLen = 30;
+  char ssidBuf[bufLen];
+  char passBuf[bufLen];
+  ssid.toCharArray(ssidBuf, bufLen);
+  pass.toCharArray(passBuf, bufLen); 
+  EEPROM.writeString(SSID_ADDR, ssidBuf);
+  EEPROM.writeString(KEY_ADDR, passBuf);
   delay(100);
-  String s = EEPROM.readString(100);
-  String p = EEPROM.readString(200);
+  String s = EEPROM.readString(SSID_ADDR);
+  String p = EEPROM.readString(KEY_ADDR);
   //#if DEBUG
-  DEBUG_SERIAL.println(F("Stored SSID, KEY, are: "));
+  DEBUG_SERIAL.println(F("Stored SSID and KEY are: "));
   DEBUG_SERIAL.print(F("SSID: "));
   DEBUG_SERIAL.println(s);
   DEBUG_SERIAL.print(F("KEY: "));
@@ -67,8 +68,6 @@ void handleRoot() {
   }
 }
 
-
-
 bool loadWiFiCredsForm() {
   String s = EEPROM.readString(SSID_ADDR);
   String p = EEPROM.readString(KEY_ADDR);
@@ -85,9 +84,7 @@ bool loadWiFiCredsForm() {
   DEBUG_SERIAL.println(IP);
   
   server.on("/", handleRoot);
-
   server.onNotFound(handleNotFound);
-
   server.begin();
   
   DEBUG_SERIAL.println(F("HTTP server started"));
@@ -101,7 +98,7 @@ bool loadWiFiCredsForm() {
   return false;
 }
 
-bool CheckWiFiCreds() {
+bool checkWiFiCreds() {
   DEBUG_SERIAL.println(F("Checking WIFI credentials"));
   String s = EEPROM.readString(SSID_ADDR);
   String p = EEPROM.readString(KEY_ADDR);
