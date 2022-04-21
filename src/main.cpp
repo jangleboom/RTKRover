@@ -288,7 +288,7 @@ void task_wifi_connection(void *pvParameters) {
     }
     setupGNSS();
     // Measure stack size
-    // UBaseType_t uxHighWaterMark;
+    // UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_wifi_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
