@@ -242,7 +242,9 @@ void printGNSSData() {
 void setupGNSS() {
     if (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false) {
     DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
-    while (1);
+    while (1) {
+        vTaskDelay(100/portTICK_PERIOD_MS);
+        }
     }
     
     myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA); //Set the I2C port to output both NMEA and UBX messages
@@ -280,10 +282,13 @@ void setupWiFi(const String& ssid, const String& key) {
 void task_wifi_connection(void *pvParameters) {
     (void)pvParameters;
 
-    Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY_100K);
+    while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY_100K)) {
+        DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+    }
     setupGNSS();
     // Measure stack size
-    UBaseType_t uxHighWaterMark;
+    // UBaseType_t uxHighWaterMark;
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_wifi_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);

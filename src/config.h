@@ -65,8 +65,8 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define BNO080_SCL_PIN                  22
 #define I2C_FREQUENCY_100K              100000  // 100 kHz
 #define I2C_FREQUENCY_400K              400000  // 400 kHz
-#define BNO080_ROT_VECT_UPDATE_RATE_MS  20      // Time between sensor readings
-#define BNO080_LIN_ACCEL_UPDATE_RATE_MS 20      // 50 Hz
+#define BNO080_ROT_VECT_UPDATE_RATE_MS  10      // Time between sensor readings
+#define BNO080_LIN_ACCEL_UPDATE_RATE_MS 10      // 100 Hz
 #define BNO080_STEP_CNT_UPDATE_RATE_MS  32      // 31.25 Hz lt. datasheet
 
 /*******************************************************************************
