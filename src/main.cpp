@@ -62,7 +62,7 @@ void buttonHandler(Button2 &btn);
  *                                   Battery
  * ****************************************************************************/
 // Messure half the battery voltage
-const int BAT_PIN = 13; 
+#define BAT_PIN                    A13
 float getBatteryVolts(void);
 
 /*******************************************************************************
@@ -142,7 +142,6 @@ bool sendLinAccZ = false;
 BNO080 bno080;
 
 void setupBNO080(void);
-const uint8_t BLE_SEND_INTERVAL = 10;
 void task_bluetooth_connection(void *pvParameters);
 
 /*******************************************************************************
@@ -154,13 +153,7 @@ SFE_UBLOX_GNSS myGNSS;
 
 void setupGNSS(void);
 void printGNSSData(void);
-
 void task_wifi_connection(void *pvParameters);
-
-#define RUNNING_CORE_0 0
-#define RUNNING_CORE_1 0
-#define GNSS_OVER_WIFI_PRIORITY 2
-#define BNO080_OVER_BLE_PRIORITY 1
 
 void setup() {
     #ifdef DEBUGGING
@@ -171,15 +164,14 @@ void setup() {
     DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
     DEBUG_SERIAL.print(F("Battery: "));
-    // DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power
-    // DEBUG_SERIAL.println(" V");
+    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power
+    DEBUG_SERIAL.println(" V");
 
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
 
-  
-
+    // TODO: make the WiFi setup a primary task
     EEPROM.begin(400);
     // wipeEEPROM();
     if (!checkWiFiCreds()) {
@@ -191,31 +183,37 @@ void setup() {
     String ssid = EEPROM.readString(SSID_ADDR);
     String key = EEPROM.readString(KEY_ADDR);
     setupWiFi(ssid, key);
+    };
+
+    
+    // Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY);
 
     // Needed to execute before tasks 
-    #define SDA_PIN 23
-    #define SCL_PIN 22
-    #define I2C_FREQUENCY 400000
-    while (!Wire.begin(SDA_PIN, SCL_PIN, I2C_FREQUENCY)) {
-        DEBUG_SERIAL.println(F("No I2C, check cable..."));
-        delay(1000);
-    };
-    // Wire.setClock(400000); //Increase I2C data rate to 400kHz
     
-    setupBNO080();
-    setupGNSS();
-     // xTaskCreatePinnedToCore( &task_wifi_connection, "task_wifi_connection", 2048, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    // TwoWire I2C_RTK = TwoWire(1);
+    // while (!I2C_RTK.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY)) {
+    //     DEBUG_SERIAL.print(F("No I2C for RTK, check cable on Pin: "));
+    //     DEBUG_SERIAL.print(RTK_SDA_PIN);
+    //     DEBUG_SERIAL.print(F(" and "));
+    //     DEBUG_SERIAL.println(RTK_SCL_PIN);
+    //     delay(500);
+    // }
+    //I2C_RTK.begin(RTK_SDA_PIN, RTK_SCL_PIN, 100000);
+    // TwoWire I2C_BNO080 = TwoWire(0);
+    // while (!I2C_BNO080.begin(BNO080_SDA_PIN, BNO080_SCL_PIN, I2C_FREQUENCY)) {
+    //     DEBUG_SERIAL.print(F("No I2C for BNO080, check cable on Pin: "));
+    //     DEBUG_SERIAL.print(BNO080_SDA_PIN);
+    //     DEBUG_SERIAL.print(F(" and "));
+    //     DEBUG_SERIAL.println(BNO080_SCL_PIN);
+    //     delay(500);
+    // }
+    // I2C_BNO080.begin(BNO080_SDA_PIN, BNO080_SCL_PIN, I2C_FREQUENCY);
+    
+    xTaskCreatePinnedToCore( &task_wifi_connection, "task_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
     xTaskCreatePinnedToCore( &task_bluetooth_connection, "task_bluetooth_connection", 10240, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
-  }
-
-    
-
-    // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
-    
-
     String thisBoard= ARDUINO_BOARD;
-    DEBUG_SERIAL.print(F("Running on "));
+    DEBUG_SERIAL.print(F("Setup done on "));
     DEBUG_SERIAL.println(thisBoard);
 }
 
@@ -229,8 +227,6 @@ void loop() {
     #endif
 
     button.loop();
- 
-    // printGNSSData();
 }
 
 void printGNSSData() {
@@ -244,7 +240,7 @@ void printGNSSData() {
  * ****************************************************************************/
 
 void setupGNSS() {
-    if (myGNSS.begin() == false) {
+    if (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false) {
     DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing."));
     while (1);
     }
@@ -281,6 +277,29 @@ void setupWiFi(const String& ssid, const String& key) {
   DEBUG_SERIAL.println(WiFi.localIP());
 }
 
+void task_wifi_connection(void *pvParameters) {
+    (void)pvParameters;
+
+    Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY_100K);
+    setupGNSS();
+    // Measure stack size
+    UBaseType_t uxHighWaterMark;
+    // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+    // DEBUG_SERIAL.print(F("task_wifi_connection setup, uxHighWaterMark: "));
+    // DEBUG_SERIAL.println(uxHighWaterMark);
+    
+    while (1) {
+        printGNSSData();
+        // Measure stack size (last was 19320)
+        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        // DEBUG_SERIAL.print(F("task_wifi_connection loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.println(uxHighWaterMark);
+        vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
+
+    }
+    // Delete self task
+    vTaskDelete(NULL);
+}
 /*******************************************************************************
  *                                 BLE
  * ****************************************************************************/
@@ -292,12 +311,12 @@ void setupBLE(void)
     BLEService *pService = pServer->createService(SERVICE_UUID);
   
     pCharacteristicTracking = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID_NOTIFY,
+                                         CHARACTERISTIC_UUID_BNO080,
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
                                          BLECharacteristic::PROPERTY_NOTIFY 
-                                         
+                                         // We only use notify characteristic
                                        );
 
     pCharacteristicTracking->addDescriptor(new BLE2902());
@@ -318,20 +337,25 @@ void setupBNO080()
 {   
     while (!bno080.begin()) {
         // Wait
-        delay(100);
-    }; 
+        delay(1000);
+        DEBUG_SERIAL.println(F("BNO080 not ready, waiting for I2C..."));
+    }
+    
     // Activate IMU functionalities
     //bno080.calibrateAll();
-    bno080.enableRotationVector(BNO080_UPDATE_RATE_MS);       
-    bno080.enableLinearAccelerometer(BNO080_UPDATE_RATE_MS);    
+    bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);   
+    bno080.enableAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
+    bno080.enableLinearAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
     // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht.. 
-    // --> timeBetweenReports should not be 20 ms ;)  try this: 
-    // bno080.enableStepCounter(500);
+    // --> timeBetweenReports should not be 20 ms ;)  try this: 31.25 Hz
+    // bno080.enableStepCounter(32);
 }
 
 void task_bluetooth_connection(void *pvParameters) {
     (void)pvParameters;
-    // setupBNO080();
+    Wire.begin();
+    Wire.setClock(I2C_FREQUENCY_400K);
+    setupBNO080();
     setupBLE(); 
     while (!bleConnected) {
         DEBUG_SERIAL.println(F("Waiting for BLE connection"));
@@ -341,7 +365,9 @@ void task_bluetooth_connection(void *pvParameters) {
     float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
     int pitchDegree, yawDegree;// rollDegree;
     String dataStr((char *)0);
+    // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
     dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
+    
     // Measure stack size
     // UBaseType_t uxHighWaterMark;
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -373,13 +399,14 @@ void task_bluetooth_connection(void *pvParameters) {
             // rollDegreeF = rollDegreeF * -180.0 / M_PI;
             // rollDegree = (int)(round(rollDegreeF));
 
-            linAccelZF = bno080.getLinAccelZ(); 
+            // Seems to be much slower than bno080.getAccelZ()
+            linAccelZF = bno080.getLinAccelZ();  
 
             dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
                     + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
             pCharacteristicTracking->setValue(dataStr.c_str());
             pCharacteristicTracking->notify();
-            // DEBUG_SERIAL.print(dataStr);      
+            // DEBUG_SERIAL.println(linAccelZF);      
         } else {
             DEBUG_SERIAL.println(F("Waiting for BNO080 data"));
             vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -388,12 +415,12 @@ void task_bluetooth_connection(void *pvParameters) {
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DEBUG_SERIAL.print(F("task_bluetooth_connection loop, uxHighWaterMark: "));
         // DEBUG_SERIAL.println(uxHighWaterMark);
-        vTaskDelay(BLE_SEND_INTERVAL/portTICK_PERIOD_MS);
-
+        vTaskDelay(BLE_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
     }
     // Delete self task
     vTaskDelete(NULL);
 }
+
 /*******************************************************************************
  *                                 Further system components
  * ****************************************************************************/
