@@ -40,10 +40,10 @@
 #include <BLE2902.h>
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 #include <SparkFun_BNO080_Arduino_Library.h>
-#include "utility/imumaths.h"
-#include "sdkconfig.h"
-#include "config.h"
-#include "WiFiManager.h"
+#include <imumaths.h>
+#include <sdkconfig.h>
+#include <config.h>
+#include <WiFiManager.h>
 
 
 String deviceName = getDeviceName(DEVICE_TYPE);
@@ -125,8 +125,6 @@ class MyServerCallbacks: public BLEServerCallbacks
 };
 
 BLECharacteristic *pCharacteristicTracking;
-
-
 void setupBLE(void);
 
 /*******************************************************************************
@@ -233,7 +231,7 @@ void printGNSSData() {
     DEBUG_SERIAL.println("\n****\n");
     myGNSS.checkUblox(); //See if new data is available. Process bytes as they come in.
     DEBUG_SERIAL.println("\n****\n");
-    vTaskDelay(250); //Don't pound too hard on the I2C bus
+    // vTaskDelay(250); //Don't pound too hard on the I2C bus
 }
 /*******************************************************************************
  *                                 GNSS
@@ -282,10 +280,11 @@ void setupWiFi(const String& ssid, const String& key) {
 void task_wifi_connection(void *pvParameters) {
     (void)pvParameters;
 
-    while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY_100K)) {
-        DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-    }
+    // while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) {
+    //     DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
+    //     vTaskDelay(1000/portTICK_PERIOD_MS);
+    // }
+    // Wire1.setClock(I2C_FREQUENCY_100K);
     setupGNSS();
     // Measure stack size
     // UBaseType_t uxHighWaterMark; 
