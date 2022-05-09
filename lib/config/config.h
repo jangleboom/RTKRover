@@ -25,7 +25,7 @@
 /*******************************************************************************
  *                         Default WiFi settings
  * ****************************************************************************/
-#define DEVICE_TYPE                  "HTRTK_"
+#define DEVICE_TYPE                  "RTKRover_"
 #define DEFAULT_KEY                  "12345678"
 String getDeviceName(const String &);
 uint32_t getChipId(void);
@@ -79,7 +79,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define GNSS_OVER_WIFI_PRIORITY       2  // GNSS should have a lower priority
 #define BNO080_OVER_BLE_PRIORITY      1  // Headtracking: highest priority
 #define BLE_TASK_INTERVAL_MS          10
-#define WIFI_TASK_INTERVAL_MS         500
+#define WIFI_TASK_INTERVAL_MS         1000
 
 /*******************************************************************************
  *                         Help Functions
