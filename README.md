@@ -5,6 +5,10 @@ Hardware used:
 * SparkFun BNO080 Breakout
 * ublox ANN-MB1 antenna
 
+Infrastructure:
+* WiFi (e. g. a personal hotspot)
+* free line of sight between antenna (horizontal placed) an sky
+
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
 ````
