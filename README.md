@@ -16,7 +16,7 @@ To connect to a caster you need to create a secrets.h file with your credentials
 #define SECRETS_H
 // A place for your caster credentials
 
-//RTK2Go MountPoint http://www.rtk2go.com:2101/SNIP::STATUS#uptime
+// RTK2Go MountPoint http://www.rtk2go.com:2101/SNIP::STATUS#uptime
 // Email: YOUR_ACCOUNT_EMAIL.COM
 const char casterHost[] = "rtk2go.com";
 const uint16_t casterPort = 2101;
@@ -28,7 +28,7 @@ const char casterUserPW[] = "";
 
 // Another free NTRIP Caster is Emlid
 // Emlid Caster MountPoint
-// Email: mr.markuese@gmail.com
+// Email: YOUR_ACCOUNT_EMAIL.COM
 const char casterHost[] = "caster.emlid.com";
 const uint16_t casterPort = 2101;
 const char casterUser[] = "YOUR_EMLID_USER_NAME";   //User name and pw must be obtained through their web portal

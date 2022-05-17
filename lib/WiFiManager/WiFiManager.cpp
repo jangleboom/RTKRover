@@ -87,7 +87,7 @@ bool loadWiFiCredsForm() {
   server.onNotFound(handleNotFound);
   server.begin();
   
-  DEBUG_SERIAL.println(F("HTTP server started"));
+  DEBUG_SERIAL.println(F("HTTP server (AP) started, please connect and enter your WiFi credentials"));
  
   while (s.length() <= 0 || p.length() <= 0) {
     server.handleClient();

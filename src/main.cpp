@@ -6,15 +6,16 @@
  * @brief This is part of a distributed software, here: head tracker and GNSS 
  *        positioning using Sparkfun Real Time Kinematics
  * <br>
- * @todo  - FREE RTOS
+ * @todo  - Task to check / reconnect WiFi (independent of head tracking)
  *        - Calibration button (?)
  *        - Test: BNO080 found/connected
  *        - Test: BLE 
+ *        - Status led for WiFi/BLE? on the device box or monitoring in app only?
  *        
  * @note How to handle WiFi: 
  *        - Push the button 
  *        - Join the AP thats appearing 
- *            -# SSID: e. g. "HTRTK_" + ChipID 
+ *            -# SSID: e. g. "RTKRover_" + ChipID 
  *            -# PW: e. g. "12345678"
  *        - Open address 192.168.4.1 in your browser and set credentials you are 
  *          using for you personal access point on your smartphone
@@ -43,7 +44,7 @@
 #include <imumaths.h>
 #include <sdkconfig.h>
 #include <config.h>
-#include "secrets.h"
+#include <secrets.h>
 #include <WiFiManager.h>
 
 
@@ -220,7 +221,7 @@ void setup() {
     // }
     // I2C_BNO080.begin(BNO080_SDA_PIN, BNO080_SCL_PIN, I2C_FREQUENCY);
     
-    // xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
     xTaskCreatePinnedToCore( &task_bluetooth_connection, "task_bluetooth_connection", 10240, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
     String thisBoard= ARDUINO_BOARD;
@@ -438,14 +439,13 @@ void beginClient() {
 void setupWiFi(const String& ssid, const String& key) {
   delay(10);
   // We start by connecting to a WiFi network
-  DEBUG_SERIAL.println();
-  DEBUG_SERIAL.print("Connecting to ");
+  DEBUG_SERIAL.print(F("\nConnecting to "));
   DEBUG_SERIAL.println(ssid);
   WiFi.mode(WIFI_STA);
   WiFi.softAPdisconnect(true);
   WiFi.begin(ssid.c_str(), key.c_str());
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     DEBUG_SERIAL.print(".");
   }
   DEBUG_SERIAL.println("");
