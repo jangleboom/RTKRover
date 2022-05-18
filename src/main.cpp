@@ -147,6 +147,10 @@ void task_bluetooth_connection(void *pvParameters);
 /*******************************************************************************
  *                                 GNSS
  * ****************************************************************************/
+#include <MicroNMEA.h> //http://librarymanager/All#MicroNMEA
+char nmeaBuffer[100];
+MicroNMEA nmea(nmeaBuffer, sizeof(nmeaBuffer));
+
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 
 //The ESP32 core has a built in base64 library but not every platform does
@@ -251,12 +255,27 @@ void setupGNSS() {
         delay(1000);
         }
     
-    myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
+    myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA); //Set the I2C port to output both NMEA and UBX messages
+    myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
+    myGNSS.setProcessNMEAMask(SFE_UBLOX_FILTER_NMEA_ALL); // Make sure the library is passing all NMEA messages to processNMEA
+    myGNSS.setProcessNMEAMask(SFE_UBLOX_FILTER_NMEA_GGA); // Or, we can be kind to MicroNMEA and _only_ pass the GGA messages to it
+    // myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
     myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
     myGNSS.setNavigationFrequency(1); //Set output in Hz.
     #ifdef DEBUGGING
     myGNSS.setNMEAOutputPort(Serial);
     #endif
+}
+
+//This function gets called from the SparkFun u-blox Arduino Library
+//As each NMEA character comes in you can specify what to do with it
+//Useful for passing to other libraries like tinyGPS, MicroNMEA, or even
+//a buffer, radio, etc.
+void SFE_UBLOX_GNSS::processNMEA(char incoming)
+{
+  //Take the incoming char from the u-blox I2C port and pass it on to the MicroNMEA lib
+  //for sentence cracking
+  nmea.process(incoming);
 }
 
 //Connect to NTRIP Caster, receive RTCM, and push to ZED module over I2C
@@ -411,6 +430,24 @@ void beginClient() {
         myGNSS.pushRawData(rtcmData, rtcmCount, false);
         Serial.print(F("RTCM pushed to ZED: "));
         Serial.println(rtcmCount);
+        myGNSS.checkUblox();
+
+          if(nmea.isValid() == true)
+  {
+    long latitude_mdeg = nmea.getLatitude();
+    long longitude_mdeg = nmea.getLongitude();
+
+    Serial.print("Latitude (deg): ");
+    Serial.println(latitude_mdeg / 1000000., 6);
+    Serial.print("Longitude (deg): ");
+    Serial.println(longitude_mdeg / 1000000., 6);
+
+    nmea.clear(); // Clear the MicroNMEA storage to make sure we are getting fresh data
+  }
+  else
+  {
+    Serial.println("Waiting for fresh data");
+  }
       }
     }
 
