@@ -41,8 +41,10 @@ uint32_t getChipId(void);
  *                         Default BLE settings
  * ****************************************************************************/
 #define PAYLOAD_BUF_LEN              20
-#define SERVICE_UUID                 "713D0000-503E-4C75-BA94-3148F18D941E"
-#define CHARACTERISTIC_UUID_BNO080   "713D0002-503E-4C75-BA94-3148F18D941E"
+#define SERVICE_UUID                           "713D0000-503E-4C75-BA94-3148F18D941E"
+#define CHARACTERISTIC_BNO080_HEADTRACK_UUID   "713D0001-503E-4C75-BA94-3148F18D941E"
+// #define CHARACTERISTIC_BNO080_LINACCEL_UUID    "713D0002-503E-4C75-BA94-3148F18D941E"
+#define CHARACTERISTIC_RTK_UUID                "713D0003-503E-4C75-BA94-3148F18D941E"
 #define LIN_ACCEL_Z_DECIMAL_DIGITS   2
 #define DATA_STR_DELIMITER           " "
 

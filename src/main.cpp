@@ -80,9 +80,9 @@ float bleConnected = false; // TODO: deglobalize this
 
 class MyCharacteristicCallbacks: public BLECharacteristicCallbacks 
 {
-    void onWrite(BLECharacteristic *pCharacteristicTracking) 
+    void onWrite(BLECharacteristic *pCharacteristicHeadTracking) 
     {   
-        std::string value = pCharacteristicTracking->getValue(); // Here I get the commands from the App (client)
+        std::string value = pCharacteristicHeadTracking->getValue(); // Here I get the commands from the App (client)
 
         if (value.length() > 0) 
         {
@@ -126,7 +126,10 @@ class MyServerCallbacks: public BLEServerCallbacks
     }
 };
 
-BLECharacteristic *pCharacteristicTracking;
+BLECharacteristic *pCharacteristicHeadTracking = NULL;
+// BLECharacteristic *pCharacteristicLinAcceleration = NULL;
+BLECharacteristic *pCharacteristicPositionTracking = NULL;
+
 void setupBLE(void);
 
 /*******************************************************************************
@@ -528,8 +531,8 @@ void setupBLE(void)
     pServer->setCallbacks(new MyServerCallbacks()); 
     BLEService *pService = pServer->createService(SERVICE_UUID);
   
-    pCharacteristicTracking = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID_BNO080,
+    pCharacteristicHeadTracking = pService->createCharacteristic(
+                                         CHARACTERISTIC_BNO080_HEADTRACK_UUID,
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
@@ -537,12 +540,14 @@ void setupBLE(void)
                                          // We only use notify characteristic
                                        );
 
-    pCharacteristicTracking->addDescriptor(new BLE2902());
-    pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
-    pCharacteristicTracking->setValue(deviceName.c_str());
+    pCharacteristicHeadTracking->addDescriptor(new BLE2902());
+    pCharacteristicHeadTracking->setCallbacks(new MyCharacteristicCallbacks());
+    pCharacteristicHeadTracking->setValue(deviceName.c_str());
     pService->start();
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
+    // pAdvertising->setScanResponse(false);
+    // pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
     pAdvertising->setScanResponse(true);
     pAdvertising->setMinPreferred(0x12);  // 0x06 x 1.25 ms = 7.5 ms, functions that help with iPhone connections issue
     pAdvertising->setMaxPreferred(0x24);  // 30 ms
@@ -623,8 +628,8 @@ void task_bluetooth_connection(void *pvParameters) {
 
             dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
                     + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
-            pCharacteristicTracking->setValue(dataStr.c_str());
-            pCharacteristicTracking->notify();
+            pCharacteristicHeadTracking->setValue(dataStr.c_str());
+            pCharacteristicHeadTracking->notify();
             // DEBUG_SERIAL.println(linAccelZF);      
         } else {
             DEBUG_SERIAL.println(F("Waiting for BNO080 data"));
