@@ -170,7 +170,7 @@ int maxTimeBeforeHangup_ms = 10000; //If we fail to get a complete RTCM frame af
 SFE_UBLOX_GNSS myGNSS;
 
 void setupGNSS(void);
-void beginClient(void);
+void beginClient(WiFiClient* ntripClient, long rtcmCount);
 // void printGNSSData(void);
 void task_rtk_wifi_connection(void *pvParameters);
 
@@ -261,7 +261,7 @@ void setupGNSS() {
     myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA); //Set the I2C port to output both NMEA and UBX messages
     myGNSS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT); //Save (only) the communications port settings to flash and BBR
     myGNSS.setProcessNMEAMask(SFE_UBLOX_FILTER_NMEA_ALL); // Make sure the library is passing all NMEA messages to processNMEA
-    myGNSS.setProcessNMEAMask(SFE_UBLOX_FILTER_NMEA_GGA); // Or, we can be kind to MicroNMEA and _only_ pass the GGA messages to it
+    // myGNSS.setProcessNMEAMask(SFE_UBLOX_FILTER_NMEA_GGA); // Or, we can be kind to MicroNMEA and _only_ pass the GGA messages to it
     // myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
     myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
     myGNSS.setNavigationFrequency(1); //Set output in Hz.
@@ -282,23 +282,20 @@ void SFE_UBLOX_GNSS::processNMEA(char incoming)
 }
 
 //Connect to NTRIP Caster, receive RTCM, and push to ZED module over I2C
-void beginClient() {
-  WiFiClient ntripClient;
-  long rtcmCount = 0;
+void beginClient(WiFiClient *ntripClient, long rtcmCount) {
+  // Serial.println(F("Subscribing to Caster. Press key to stop"));
+  // delay(10); //Wait for any serial to arrive
+  // while (Serial.available()) Serial.read(); //Flush
 
-  Serial.println(F("Subscribing to Caster. Press key to stop"));
-  delay(10); //Wait for any serial to arrive
-  while (Serial.available()) Serial.read(); //Flush
-
-  while (Serial.available() == 0)
-  {
+  // while (Serial.available() == 0)
+  // {
     //Connect if we are not already. Limit to 5s between attempts.
-    if (ntripClient.connected() == false)
+    if (ntripClient->connected() == false)
     {
       Serial.print(F("Opening socket to "));
       Serial.println(casterHost);
 
-      if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
+      if (ntripClient->connect(casterHost, casterPort) == false) //Attempt connection
       {
         Serial.println(F("Connection to caster failed"));
         return;
@@ -358,16 +355,16 @@ void beginClient() {
 
         Serial.println(F("Sending server request:"));
         Serial.println(serverRequest);
-        ntripClient.write(serverRequest, strlen(serverRequest));
+        ntripClient->write(serverRequest, strlen(serverRequest));
 
         //Wait for response
         unsigned long timeout = millis();
-        while (ntripClient.available() == 0)
+        while (ntripClient->available() == 0)
         {
           if (millis() - timeout > 5000)
           {
             Serial.println(F("Caster timed out!"));
-            ntripClient.stop();
+            ntripClient->stop();
             return;
           }
           delay(10);
@@ -377,11 +374,11 @@ void beginClient() {
         bool connectionSuccess = false;
         char response[512];
         int responseSpot = 0;
-        while (ntripClient.available())
+        while (ntripClient->available())
         {
           if (responseSpot == sizeof(response) - 1) break;
 
-          response[responseSpot++] = ntripClient.read();
+          response[responseSpot++] = ntripClient->read();
           if (strstr(response, "200") > 0) //Look for 'ICY 200 OK'
             connectionSuccess = true;
           if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
@@ -412,16 +409,16 @@ void beginClient() {
       } //End attempt to connect
     } //End connected == false
 
-    if (ntripClient.connected() == true)
+    if (ntripClient->connected() == true)
     {
       uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
       rtcmCount = 0;
 
       //Print any available RTCM data
-      while (ntripClient.available())
+      while (ntripClient->available())
       {
-        //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
-        rtcmData[rtcmCount++] = ntripClient.read();
+        //Serial.write(ntripClient->read()); //Pipe to serial port is fine but beware, it's a lot of binary data
+        rtcmData[rtcmCount++] = ntripClient->read();
         if (rtcmCount == sizeof(rtcmData)) break;
       }
 
@@ -434,9 +431,10 @@ void beginClient() {
         Serial.print(F("RTCM pushed to ZED: "));
         Serial.println(rtcmCount);
         myGNSS.checkUblox();
+      }
+    }
 
-          if(nmea.isValid() == true)
-  {
+  if (nmea.isValid() == true) {
     long latitude_mdeg = nmea.getLatitude();
     long longitude_mdeg = nmea.getLongitude();
 
@@ -444,31 +442,30 @@ void beginClient() {
     Serial.println(latitude_mdeg / 1000000., 6);
     Serial.print("Longitude (deg): ");
     Serial.println(longitude_mdeg / 1000000., 6);
-
+    Serial.print("Num. satellites: ");
+    Serial.println(nmea.getNumSatellites());
     nmea.clear(); // Clear the MicroNMEA storage to make sure we are getting fresh data
   }
   else
   {
-    Serial.println("Waiting for fresh data");
+        Serial.print("Waiting for NMEA data");
   }
-      }
-    }
 
     //Close socket if we don't have new data for 10s
     if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
     {
       Serial.println(F("RTCM timeout. Disconnecting..."));
-      if (ntripClient.connected() == true)
-        ntripClient.stop();
+      if (ntripClient->connected() == true)
+        ntripClient->stop();
       return;
     }
 
-    delay(10);
-  }
+  //   delay(10);
+  // }
 
-  Serial.println(F("User pressed a key"));
-  Serial.println(F("Disconnecting..."));
-  ntripClient.stop();
+  // Serial.println(F("User pressed a key"));
+  // Serial.println(F("Disconnecting..."));
+  // ntripClient->stop();
 }
 
 
@@ -508,9 +505,10 @@ void task_rtk_wifi_connection(void *pvParameters) {
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_rtk_wifi_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
-    
+    WiFiClient ntripClient;
+    long rtcmCount = 0;
     while (1) {
-        beginClient();
+        beginClient(&ntripClient, rtcmCount);
         // Measure stack size (last was 19320)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DEBUG_SERIAL.print(F("task_rtk_wifi_connection loop, uxHighWaterMark: "));
