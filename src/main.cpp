@@ -457,7 +457,7 @@ void beginClient(WiFiClient *ntripClient, long rtcmCount) {
       Serial.println(F("RTCM timeout. Disconnecting..."));
       if (ntripClient->connected() == true)
         ntripClient->stop();
-      return;
+      // return;
     }
 
   //   delay(10);
