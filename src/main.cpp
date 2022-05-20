@@ -127,6 +127,7 @@ class MyServerCallbacks: public BLEServerCallbacks
 };
 
 BLECharacteristic *pCharacteristicTracking;
+BLECharacteristic *pCharacteristicPositioning;
 void setupBLE(void);
 
 /*******************************************************************************
@@ -142,7 +143,7 @@ bool sendLinAccZ = false;
 BNO080 bno080;
 
 void setupBNO080(void);
-void task_bluetooth_connection(void *pvParameters);
+void task_send_bno080_ble(void *pvParameters);
 
 /*******************************************************************************
  *                                 GNSS
@@ -166,13 +167,17 @@ void setupGNSS(void);
 void beginClient(void);
 void getPosition(void);
 // void printGNSSData(void);
-void task_rtk_wifi_connection(void *pvParameters);
+void task_get_rtcm_wifi(void *pvParameters);
+void task_send_rtk_ble(void *pvParameters);
 
 void setup() {
     #ifdef DEBUGGING
     Serial.begin(BAUD);
     while (!Serial) {};
     #endif
+    Wire.begin();
+    setupBLE();
+    setupBNO080();
 
     DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
@@ -183,7 +188,7 @@ void setup() {
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
     pinMode(LED_BUILTIN, OUTPUT);
     digitalWrite(LED_BUILTIN, LOW);
-
+    
     // TODO: make the WiFi setup a primary task
     EEPROM.begin(400);
     // wipeEEPROM();
@@ -198,8 +203,9 @@ void setup() {
     connectToWiFiAP(ssid, key);
     }
     
-    xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 1024 * 12, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-    xTaskCreatePinnedToCore( &task_bluetooth_connection, "task_bluetooth_connection", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 12, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
     String thisBoard= ARDUINO_BOARD;
     DEBUG_SERIAL.print(F("Setup done on "));
@@ -283,7 +289,7 @@ void connectToWiFiAP(const String& ssid, const String& key) {
   DEBUG_SERIAL.println(WiFi.localIP());
 }
 
-void task_rtk_wifi_connection(void *pvParameters) {
+void task_get_rtcm_wifi(void *pvParameters) {
     (void)pvParameters;
 
     while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) {
@@ -295,7 +301,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DEBUG_SERIAL.print(F("task_rtk_wifi_connection setup, uxHighWaterMark: "));
+    // DEBUG_SERIAL.print(F("task_get_rtcm_wifi setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
     WiFiClient ntripClient;
     long rtcmCount = 0;
@@ -446,7 +452,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
           getPosition();
                   // Measure stack size (last was 19320)
         uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        DEBUG_SERIAL.print(F("task_rtk_wifi_connection loop, uxHighWaterMark: "));
+        DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
         DEBUG_SERIAL.println(uxHighWaterMark);
         }
       }
@@ -464,7 +470,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
         /************************************************************************/
         // Measure stack size (last was 19320)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_rtk_wifi_connection loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
         // DEBUG_SERIAL.println(uxHighWaterMark);
         vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
 
@@ -491,9 +497,22 @@ void setupBLE(void)
                                          // We only use notify characteristic
                                        );
 
-    // pCharacteristicTracking->addDescriptor(new BLE2902());
-    // pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
-    // pCharacteristicTracking->setValue(deviceName.c_str());
+    pCharacteristicTracking->addDescriptor(new BLE2902());
+    pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
+    pCharacteristicTracking->setValue(deviceName.c_str());
+
+    pCharacteristicPositioning = pService->createCharacteristic(
+                                         CHARACTERISTIC_UUID_RTK,
+                                        //  BLECharacteristic::PROPERTY_READ   |
+                                        //  BLECharacteristic::PROPERTY_WRITE  |
+                                        //  BLECharacteristic::PROPERTY_INDICATE |
+                                         BLECharacteristic::PROPERTY_NOTIFY 
+                                         // We only use notify characteristic
+                                       );
+
+    // pCharacteristicPositioning->addDescriptor(new BLE2902());
+    // pCharacteristicPositioning->setCallbacks(new MyCharacteristicCallbacks());
+    // pCharacteristicPositioning->setValue(deviceName.c_str());
 
     pService->start();
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
@@ -524,13 +543,20 @@ void setupBNO080()
     // bno080.enableStepCounter(32);
 }
 
-void task_bluetooth_connection(void *pvParameters) {
+void task_send_rtk_ble(void *pvParameters) {
+  (void)pvParameters;
+  while (!bleConnected) {
+    DEBUG_SERIAL.println(F("Waiting for BLE connection"));
+    delay(1000);
+    }
+  String dataStr((char *)0);
+  // Latitude: 9, delimiter: 1, longitude: 9, delimiter: 1, accuracy: 3
+    // dataStr.reserve(23);
+}
+
+void task_send_bno080_ble(void *pvParameters) {
     (void)pvParameters;
 
-    Wire.begin();
-    setupBNO080();
-    
-    setupBLE();
     while (!bleConnected) {
         DEBUG_SERIAL.println(F("Waiting for BLE connection"));
         delay(1000);
@@ -545,7 +571,7 @@ void task_bluetooth_connection(void *pvParameters) {
     // Measure stack size
     // UBaseType_t uxHighWaterMark;
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DEBUG_SERIAL.print(F("task_bluetooth_connection setup, uxHighWaterMark: "));
+    // DEBUG_SERIAL.print(F("task_send_bno080_ble setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
 
     while (true) {
@@ -587,7 +613,7 @@ void task_bluetooth_connection(void *pvParameters) {
             }
         // Measure stack size
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_bluetooth_connection loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.print(F("task_send_bno080_ble loop, uxHighWaterMark: "));
         // DEBUG_SERIAL.println(uxHighWaterMark);
         vTaskDelay(BLE_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
     }
