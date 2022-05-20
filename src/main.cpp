@@ -235,176 +235,6 @@ void setupGNSS() {
     #endif
 }
 
-//Connect to NTRIP Caster, receive RTCM, and push to ZED module over I2C
-void beginClient() {
-
-  // Serial.println(F("Subscribing to Caster. Press key to stop"));
-  // delay(10); //Wait for any serial to arrive
-  // while (Serial.available()) Serial.read(); //Flush
-
-  // while (Serial.available() == 0)
-  // {
-    //Connect if we are not already. Limit to 5s between attempts.
-//     if (ntripClient.connected() == false)
-//     {
-//       Serial.print(F("Opening socket to "));
-//       Serial.println(casterHost);
-
-//       if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
-//       {
-//         Serial.println(F("Connection to caster failed"));
-//         return;
-//       }
-//       else
-//       {
-//         Serial.print(F("Connected to "));
-//         Serial.print(casterHost);
-//         Serial.print(F(": "));
-//         Serial.println(casterPort);
-
-//         Serial.print(F("Requesting NTRIP Data from mount point "));
-//         Serial.println(mountPoint);
-
-//         const int SERVER_BUFFER_SIZE  = 512;
-//         char serverRequest[SERVER_BUFFER_SIZE];
-
-//         snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
-//                  mountPoint);
-
-//         char credentials[512];
-//         if (strlen(casterUser) == 0)
-//         {
-//           strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
-//         }
-//         else
-//         {
-//           //Pass base64 encoded user:pw
-//           char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
-//           snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
-
-//           Serial.print(F("Sending credentials: "));
-//           Serial.println(userCredentials);
-
-// #if defined(ARDUINO_ARCH_ESP32)
-//           //Encode with ESP32 built-in library
-//           base64 b;
-//           String strEncodedCredentials = b.encode(userCredentials);
-//           char encodedCredentials[strEncodedCredentials.length() + 1];
-//           strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
-//           snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
-// #else
-//           //Encode with nfriendly library
-//           int encodedLen = base64_enc_len(strlen(userCredentials));
-//           char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
-//           base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
-// #endif
-//         }
-//         strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
-//         strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
-
-//         Serial.print(F("serverRequest size: "));
-//         Serial.print(strlen(serverRequest));
-//         Serial.print(F(" of "));
-//         Serial.print(sizeof(serverRequest));
-//         Serial.println(F(" bytes available"));
-
-//         Serial.println(F("Sending server request:"));
-//         Serial.println(serverRequest);
-//         ntripClient.write(serverRequest, strlen(serverRequest));
-
-//         //Wait for response
-//         unsigned long timeout = millis();
-//         while (ntripClient.available() == 0)
-//         {
-//           if (millis() - timeout > 5000)
-//           {
-//             Serial.println(F("Caster timed out!"));
-//             ntripClient.stop();
-//             return;
-//           }
-//           delay(10);
-//         }
-
-//         //Check reply
-//         bool connectionSuccess = false;
-//         char response[512];
-//         int responseSpot = 0;
-//         while (ntripClient.available())
-//         {
-//           if (responseSpot == sizeof(response) - 1) break;
-
-//           response[responseSpot++] = ntripClient.read();
-//           if (strstr(response, "200") > 0) //Look for 'ICY 200 OK'
-//             connectionSuccess = true;
-//           if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
-//           {
-//             Serial.println(F("Hey - your credentials look bad! Check you caster username and password."));
-//             connectionSuccess = false;
-//           }
-//         }
-//         response[responseSpot] = '\0';
-
-//         Serial.print(F("Caster responded with: "));
-//         Serial.println(response);
-
-//         if (connectionSuccess == false)
-//         {
-//           Serial.print(F("Failed to connect to "));
-//           Serial.print(casterHost);
-//           Serial.print(F(": "));
-//           Serial.println(response);
-//           return;
-//         }
-//         else
-//         {
-//           Serial.print(F("Connected to "));
-//           Serial.println(casterHost);
-//           lastReceivedRTCM_ms = millis(); //Reset timeout
-//         }
-//       } //End attempt to connect
-//     } //End connected == false
-
-//     if (ntripClient.connected() == true)
-//     {
-//       uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
-//       rtcmCount = 0;
-
-//       //Print any available RTCM data
-//       while (ntripClient.available())
-//       {
-//         //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
-//         rtcmData[rtcmCount++] = ntripClient.read();
-//         if (rtcmCount == sizeof(rtcmData)) break;
-//       }
-
-//       if (rtcmCount > 0)
-//       {
-//         lastReceivedRTCM_ms = millis();
-
-//         //Push RTCM to GNSS module over I2C
-//         myGNSS.pushRawData(rtcmData, rtcmCount, false);
-//         Serial.print(F("RTCM pushed to ZED: "));
-//         Serial.println(rtcmCount);
-//       }
-//     }
-
-//     //Close socket if we don't have new data for 10s
-//     if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
-//     {
-//       Serial.println(F("RTCM timeout. Disconnecting..."));
-//       if (ntripClient.connected() == true)
-//         ntripClient.stop();
-//       return;
-//     }
-
-//   //   delay(10);
-//   // }
-
-//   // Serial.println(F("User pressed a key"));
-//   // Serial.println(F("Disconnecting..."));
-//   // ntripClient.stop();
-}
-
 void getPosition() {
   static long lastRun = millis();
   if (millis() - lastRun > 1000) {
@@ -480,7 +310,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
         if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
         {
           Serial.println(F("Connection to caster failed"));
-          return;
+          // return;
         }
         else
         {
@@ -547,7 +377,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
             {
               Serial.println(F("Caster timed out!"));
               ntripClient.stop();
-              return;
+              // return;
             }
             delay(10);
           }
@@ -580,7 +410,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
             Serial.print(casterHost);
             Serial.print(F(": "));
             Serial.println(response);
-            return;
+            // return;
           }
           else
           {
@@ -627,7 +457,7 @@ void task_rtk_wifi_connection(void *pvParameters) {
         Serial.println(F("RTCM timeout. Disconnecting..."));
         if (ntripClient.connected() == true)
           ntripClient.stop();
-        return;
+        // return;
       }
 
 
@@ -651,7 +481,7 @@ void setupBLE(void)
     BLEServer *pServer = BLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks()); 
     BLEService *pService = pServer->createService(SERVICE_UUID);
-  
+    // Create characteristics
     pCharacteristicTracking = pService->createCharacteristic(
                                          CHARACTERISTIC_UUID_BNO080,
                                         //  BLECharacteristic::PROPERTY_READ   |
@@ -661,9 +491,10 @@ void setupBLE(void)
                                          // We only use notify characteristic
                                        );
 
-    pCharacteristicTracking->addDescriptor(new BLE2902());
-    pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
-    pCharacteristicTracking->setValue(deviceName.c_str());
+    // pCharacteristicTracking->addDescriptor(new BLE2902());
+    // pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
+    // pCharacteristicTracking->setValue(deviceName.c_str());
+
     pService->start();
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
     pAdvertising->addServiceUUID(SERVICE_UUID);
