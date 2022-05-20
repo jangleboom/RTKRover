@@ -71,7 +71,7 @@ float getBatteryVolts(void);
  *                                 WiFi
  * ****************************************************************************/
 
-void setupWiFi(const String& ssid, const String& key);
+void connectToWiFiAP(const String& ssid, const String& key);
 
 /*******************************************************************************
  *                                 Bluetooth LE
@@ -164,6 +164,7 @@ SFE_UBLOX_GNSS myGNSS;
 
 void setupGNSS(void);
 void beginClient(void);
+void getPosition(void);
 // void printGNSSData(void);
 void task_rtk_wifi_connection(void *pvParameters);
 
@@ -194,41 +195,16 @@ void setup() {
     // Then log into WiFi
     String ssid = EEPROM.readString(SSID_ADDR);
     String key = EEPROM.readString(KEY_ADDR);
-    setupWiFi(ssid, key);
-    };
-
+    connectToWiFiAP(ssid, key);
+    }
     
-    // Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY);
-
-    // Needed to execute before tasks 
-    
-    // TwoWire I2C_RTK = TwoWire(1);
-    // while (!I2C_RTK.begin(RTK_SDA_PIN, RTK_SCL_PIN, I2C_FREQUENCY)) {
-    //     DEBUG_SERIAL.print(F("No I2C for RTK, check cable on Pin: "));
-    //     DEBUG_SERIAL.print(RTK_SDA_PIN);
-    //     DEBUG_SERIAL.print(F(" and "));
-    //     DEBUG_SERIAL.println(RTK_SCL_PIN);
-    //     delay(500);
-    // }
-    //I2C_RTK.begin(RTK_SDA_PIN, RTK_SCL_PIN, 100000);
-    // TwoWire I2C_BNO080 = TwoWire(0);
-    // while (!I2C_BNO080.begin(BNO080_SDA_PIN, BNO080_SCL_PIN, I2C_FREQUENCY)) {
-    //     DEBUG_SERIAL.print(F("No I2C for BNO080, check cable on Pin: "));
-    //     DEBUG_SERIAL.print(BNO080_SDA_PIN);
-    //     DEBUG_SERIAL.print(F(" and "));
-    //     DEBUG_SERIAL.println(BNO080_SCL_PIN);
-    //     delay(500);
-    // }
-    // I2C_BNO080.begin(BNO080_SDA_PIN, BNO080_SCL_PIN, I2C_FREQUENCY);
-    
-    xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 20480, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-    xTaskCreatePinnedToCore( &task_bluetooth_connection, "task_bluetooth_connection", 10240, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    xTaskCreatePinnedToCore( &task_rtk_wifi_connection, "task_rtk_wifi_connection", 1024 * 12, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    xTaskCreatePinnedToCore( &task_bluetooth_connection, "task_bluetooth_connection", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
     String thisBoard= ARDUINO_BOARD;
     DEBUG_SERIAL.print(F("Setup done on "));
     DEBUG_SERIAL.println(thisBoard);
 }
-
 
 void loop() {
     #ifdef DEBUGGING
@@ -249,7 +225,7 @@ void setupGNSS() {
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false) {
         DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
         delay(1000);
-        }
+      }
     
     myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
     myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
@@ -261,182 +237,205 @@ void setupGNSS() {
 
 //Connect to NTRIP Caster, receive RTCM, and push to ZED module over I2C
 void beginClient() {
-  WiFiClient ntripClient;
-  long rtcmCount = 0;
 
-  Serial.println(F("Subscribing to Caster. Press key to stop"));
-  delay(10); //Wait for any serial to arrive
-  while (Serial.available()) Serial.read(); //Flush
+  // Serial.println(F("Subscribing to Caster. Press key to stop"));
+  // delay(10); //Wait for any serial to arrive
+  // while (Serial.available()) Serial.read(); //Flush
 
-  while (Serial.available() == 0)
-  {
+  // while (Serial.available() == 0)
+  // {
     //Connect if we are not already. Limit to 5s between attempts.
-    if (ntripClient.connected() == false)
-    {
-      Serial.print(F("Opening socket to "));
-      Serial.println(casterHost);
+//     if (ntripClient.connected() == false)
+//     {
+//       Serial.print(F("Opening socket to "));
+//       Serial.println(casterHost);
 
-      if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
-      {
-        Serial.println(F("Connection to caster failed"));
-        return;
-      }
-      else
-      {
-        Serial.print(F("Connected to "));
-        Serial.print(casterHost);
-        Serial.print(F(": "));
-        Serial.println(casterPort);
+//       if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
+//       {
+//         Serial.println(F("Connection to caster failed"));
+//         return;
+//       }
+//       else
+//       {
+//         Serial.print(F("Connected to "));
+//         Serial.print(casterHost);
+//         Serial.print(F(": "));
+//         Serial.println(casterPort);
 
-        Serial.print(F("Requesting NTRIP Data from mount point "));
-        Serial.println(mountPoint);
+//         Serial.print(F("Requesting NTRIP Data from mount point "));
+//         Serial.println(mountPoint);
 
-        const int SERVER_BUFFER_SIZE  = 512;
-        char serverRequest[SERVER_BUFFER_SIZE];
+//         const int SERVER_BUFFER_SIZE  = 512;
+//         char serverRequest[SERVER_BUFFER_SIZE];
 
-        snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
-                 mountPoint);
+//         snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
+//                  mountPoint);
 
-        char credentials[512];
-        if (strlen(casterUser) == 0)
-        {
-          strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
-        }
-        else
-        {
-          //Pass base64 encoded user:pw
-          char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
-          snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
+//         char credentials[512];
+//         if (strlen(casterUser) == 0)
+//         {
+//           strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
+//         }
+//         else
+//         {
+//           //Pass base64 encoded user:pw
+//           char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
+//           snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
 
-          Serial.print(F("Sending credentials: "));
-          Serial.println(userCredentials);
+//           Serial.print(F("Sending credentials: "));
+//           Serial.println(userCredentials);
 
-#if defined(ARDUINO_ARCH_ESP32)
-          //Encode with ESP32 built-in library
-          base64 b;
-          String strEncodedCredentials = b.encode(userCredentials);
-          char encodedCredentials[strEncodedCredentials.length() + 1];
-          strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
-          snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
-#else
-          //Encode with nfriendly library
-          int encodedLen = base64_enc_len(strlen(userCredentials));
-          char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
-          base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
-#endif
-        }
-        strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
-        strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
+// #if defined(ARDUINO_ARCH_ESP32)
+//           //Encode with ESP32 built-in library
+//           base64 b;
+//           String strEncodedCredentials = b.encode(userCredentials);
+//           char encodedCredentials[strEncodedCredentials.length() + 1];
+//           strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
+//           snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
+// #else
+//           //Encode with nfriendly library
+//           int encodedLen = base64_enc_len(strlen(userCredentials));
+//           char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
+//           base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
+// #endif
+//         }
+//         strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
+//         strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
 
-        Serial.print(F("serverRequest size: "));
-        Serial.print(strlen(serverRequest));
-        Serial.print(F(" of "));
-        Serial.print(sizeof(serverRequest));
-        Serial.println(F(" bytes available"));
+//         Serial.print(F("serverRequest size: "));
+//         Serial.print(strlen(serverRequest));
+//         Serial.print(F(" of "));
+//         Serial.print(sizeof(serverRequest));
+//         Serial.println(F(" bytes available"));
 
-        Serial.println(F("Sending server request:"));
-        Serial.println(serverRequest);
-        ntripClient.write(serverRequest, strlen(serverRequest));
+//         Serial.println(F("Sending server request:"));
+//         Serial.println(serverRequest);
+//         ntripClient.write(serverRequest, strlen(serverRequest));
 
-        //Wait for response
-        unsigned long timeout = millis();
-        while (ntripClient.available() == 0)
-        {
-          if (millis() - timeout > 5000)
-          {
-            Serial.println(F("Caster timed out!"));
-            ntripClient.stop();
-            return;
-          }
-          delay(10);
-        }
+//         //Wait for response
+//         unsigned long timeout = millis();
+//         while (ntripClient.available() == 0)
+//         {
+//           if (millis() - timeout > 5000)
+//           {
+//             Serial.println(F("Caster timed out!"));
+//             ntripClient.stop();
+//             return;
+//           }
+//           delay(10);
+//         }
 
-        //Check reply
-        bool connectionSuccess = false;
-        char response[512];
-        int responseSpot = 0;
-        while (ntripClient.available())
-        {
-          if (responseSpot == sizeof(response) - 1) break;
+//         //Check reply
+//         bool connectionSuccess = false;
+//         char response[512];
+//         int responseSpot = 0;
+//         while (ntripClient.available())
+//         {
+//           if (responseSpot == sizeof(response) - 1) break;
 
-          response[responseSpot++] = ntripClient.read();
-          if (strstr(response, "200") > 0) //Look for 'ICY 200 OK'
-            connectionSuccess = true;
-          if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
-          {
-            Serial.println(F("Hey - your credentials look bad! Check you caster username and password."));
-            connectionSuccess = false;
-          }
-        }
-        response[responseSpot] = '\0';
+//           response[responseSpot++] = ntripClient.read();
+//           if (strstr(response, "200") > 0) //Look for 'ICY 200 OK'
+//             connectionSuccess = true;
+//           if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
+//           {
+//             Serial.println(F("Hey - your credentials look bad! Check you caster username and password."));
+//             connectionSuccess = false;
+//           }
+//         }
+//         response[responseSpot] = '\0';
 
-        Serial.print(F("Caster responded with: "));
-        Serial.println(response);
+//         Serial.print(F("Caster responded with: "));
+//         Serial.println(response);
 
-        if (connectionSuccess == false)
-        {
-          Serial.print(F("Failed to connect to "));
-          Serial.print(casterHost);
-          Serial.print(F(": "));
-          Serial.println(response);
-          return;
-        }
-        else
-        {
-          Serial.print(F("Connected to "));
-          Serial.println(casterHost);
-          lastReceivedRTCM_ms = millis(); //Reset timeout
-        }
-      } //End attempt to connect
-    } //End connected == false
+//         if (connectionSuccess == false)
+//         {
+//           Serial.print(F("Failed to connect to "));
+//           Serial.print(casterHost);
+//           Serial.print(F(": "));
+//           Serial.println(response);
+//           return;
+//         }
+//         else
+//         {
+//           Serial.print(F("Connected to "));
+//           Serial.println(casterHost);
+//           lastReceivedRTCM_ms = millis(); //Reset timeout
+//         }
+//       } //End attempt to connect
+//     } //End connected == false
 
-    if (ntripClient.connected() == true)
-    {
-      uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
-      rtcmCount = 0;
+//     if (ntripClient.connected() == true)
+//     {
+//       uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
+//       rtcmCount = 0;
 
-      //Print any available RTCM data
-      while (ntripClient.available())
-      {
-        //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
-        rtcmData[rtcmCount++] = ntripClient.read();
-        if (rtcmCount == sizeof(rtcmData)) break;
-      }
+//       //Print any available RTCM data
+//       while (ntripClient.available())
+//       {
+//         //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
+//         rtcmData[rtcmCount++] = ntripClient.read();
+//         if (rtcmCount == sizeof(rtcmData)) break;
+//       }
 
-      if (rtcmCount > 0)
-      {
-        lastReceivedRTCM_ms = millis();
+//       if (rtcmCount > 0)
+//       {
+//         lastReceivedRTCM_ms = millis();
 
-        //Push RTCM to GNSS module over I2C
-        myGNSS.pushRawData(rtcmData, rtcmCount, false);
-        Serial.print(F("RTCM pushed to ZED: "));
-        Serial.println(rtcmCount);
-      }
-    }
+//         //Push RTCM to GNSS module over I2C
+//         myGNSS.pushRawData(rtcmData, rtcmCount, false);
+//         Serial.print(F("RTCM pushed to ZED: "));
+//         Serial.println(rtcmCount);
+//       }
+//     }
 
-    //Close socket if we don't have new data for 10s
-    if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
-    {
-      Serial.println(F("RTCM timeout. Disconnecting..."));
-      if (ntripClient.connected() == true)
-        ntripClient.stop();
-      return;
-    }
+//     //Close socket if we don't have new data for 10s
+//     if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
+//     {
+//       Serial.println(F("RTCM timeout. Disconnecting..."));
+//       if (ntripClient.connected() == true)
+//         ntripClient.stop();
+//       return;
+//     }
 
-    delay(10);
-  }
+//   //   delay(10);
+//   // }
 
-  Serial.println(F("User pressed a key"));
-  Serial.println(F("Disconnecting..."));
-  ntripClient.stop();
+//   // Serial.println(F("User pressed a key"));
+//   // Serial.println(F("Disconnecting..."));
+//   // ntripClient.stop();
 }
 
+void getPosition() {
+  static long lastRun = millis();
+  if (millis() - lastRun > 1000) {
+    lastTime = millis(); //Update the timer
+
+    long latitude = myGNSS.getLatitude();
+    Serial.print(F("Lat: "));
+    Serial.print(latitude);
+
+    long longitude = myGNSS.getLongitude();
+    Serial.print(F(" Long: "));
+    Serial.print(longitude);
+    Serial.print(F(" (degrees * 10^-7)"));
+
+    long altitude = myGNSS.getAltitude();
+    Serial.print(F(" Alt: "));
+    Serial.print(altitude);
+    Serial.print(F(" (mm)"));
+
+    long accuracy = myGNSS.getPositionAccuracy();
+    Serial.print(F(" 3D Positional Accuracy: "));
+    Serial.print(accuracy);
+    Serial.println(F(" (mm)"));
+  }
+}
 
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
 
-void setupWiFi(const String& ssid, const String& key) {
+void connectToWiFiAP(const String& ssid, const String& key) {
   delay(10);
   // We start by connecting to a WiFi network
   DEBUG_SERIAL.print(F("\nConnecting to "));
@@ -464,13 +463,175 @@ void task_rtk_wifi_connection(void *pvParameters) {
     Wire1.setClock(I2C_FREQUENCY_100K);
     setupGNSS();
     // Measure stack size
-    // UBaseType_t uxHighWaterMark; 
+    UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_rtk_wifi_connection setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
-    
+    WiFiClient ntripClient;
+    long rtcmCount = 0;
+
     while (1) {
-        beginClient();
+
+      if (ntripClient.connected() == false)
+      {
+        Serial.print(F("Opening socket to "));
+        Serial.println(casterHost);
+
+        if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
+        {
+          Serial.println(F("Connection to caster failed"));
+          return;
+        }
+        else
+        {
+          Serial.print(F("Connected to "));
+          Serial.print(casterHost);
+          Serial.print(F(": "));
+          Serial.println(casterPort);
+
+          Serial.print(F("Requesting NTRIP Data from mount point "));
+          Serial.println(mountPoint);
+
+          const int SERVER_BUFFER_SIZE  = 512;
+          char serverRequest[SERVER_BUFFER_SIZE];
+
+          snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
+                  mountPoint);
+
+          char credentials[512];
+          if (strlen(casterUser) == 0)
+          {
+            strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
+          }
+          else
+          {
+            //Pass base64 encoded user:pw
+            char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
+            snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
+
+            Serial.print(F("Sending credentials: "));
+            Serial.println(userCredentials);
+
+  #if defined(ARDUINO_ARCH_ESP32)
+            //Encode with ESP32 built-in library
+            base64 b;
+            String strEncodedCredentials = b.encode(userCredentials);
+            char encodedCredentials[strEncodedCredentials.length() + 1];
+            strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
+            snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
+  #else
+            //Encode with nfriendly library
+            int encodedLen = base64_enc_len(strlen(userCredentials));
+            char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
+            base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
+  #endif
+          }
+          strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
+          strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
+
+          Serial.print(F("serverRequest size: "));
+          Serial.print(strlen(serverRequest));
+          Serial.print(F(" of "));
+          Serial.print(sizeof(serverRequest));
+          Serial.println(F(" bytes available"));
+
+          Serial.println(F("Sending server request:"));
+          Serial.println(serverRequest);
+          ntripClient.write(serverRequest, strlen(serverRequest));
+
+          //Wait for response
+          unsigned long timeout = millis();
+          while (ntripClient.available() == 0)
+          {
+            if (millis() - timeout > CONNECTION_TIMEOUT_MS)
+            {
+              Serial.println(F("Caster timed out!"));
+              ntripClient.stop();
+              return;
+            }
+            delay(10);
+          }
+
+          //Check reply
+          bool connectionSuccess = false;
+          char response[512];
+          int responseSpot = 0;
+          while (ntripClient.available())
+          {
+            if (responseSpot == sizeof(response) - 1) break;
+
+            response[responseSpot++] = ntripClient.read();
+            if (strstr(response, "200") > 0) //Look for 'ICY 200 OK'
+              connectionSuccess = true;
+            if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
+            {
+              Serial.println(F("Hey - your credentials look bad! Check you caster username and password."));
+              connectionSuccess = false;
+            }
+          }
+          response[responseSpot] = '\0';
+
+          Serial.print(F("Caster responded with: "));
+          Serial.println(response);
+
+          if (connectionSuccess == false)
+          {
+            Serial.print(F("Failed to connect to "));
+            Serial.print(casterHost);
+            Serial.print(F(": "));
+            Serial.println(response);
+            return;
+          }
+          else
+          {
+            Serial.print(F("Connected to "));
+            Serial.println(casterHost);
+            lastReceivedRTCM_ms = millis(); //Reset timeout
+          }
+        } //End attempt to connect
+      } //End connected == false
+
+      if (ntripClient.connected() == true)
+      {
+        uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
+        rtcmCount = 0;
+
+        //Print any available RTCM data
+        while (ntripClient.available())
+        {
+          //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
+          rtcmData[rtcmCount++] = ntripClient.read();
+          if (rtcmCount == sizeof(rtcmData)) break;
+        }
+
+        if (rtcmCount > 0)
+        {
+          lastReceivedRTCM_ms = millis();
+
+          //Push RTCM to GNSS module over I2C
+          myGNSS.pushRawData(rtcmData, rtcmCount, false);
+          Serial.print(F("RTCM pushed to ZED: "));
+          Serial.println(rtcmCount);
+          // myGNSS.checkUblox();
+          getPosition();
+                  // Measure stack size (last was 19320)
+        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        DEBUG_SERIAL.print(F("task_rtk_wifi_connection loop, uxHighWaterMark: "));
+        DEBUG_SERIAL.println(uxHighWaterMark);
+        }
+      }
+
+      //Close socket if we don't have new data for 10s
+      if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
+      {
+        Serial.println(F("RTCM timeout. Disconnecting..."));
+        if (ntripClient.connected() == true)
+          ntripClient.stop();
+        return;
+      }
+
+
+        /************************************************************************/
         // Measure stack size (last was 19320)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DEBUG_SERIAL.print(F("task_rtk_wifi_connection loop, uxHighWaterMark: "));
