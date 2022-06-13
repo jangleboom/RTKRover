@@ -166,9 +166,15 @@ SFE_UBLOX_GNSS myGNSS;
 void setupGNSS(void);
 void beginClient(void);
 void getPosition(void);
+
+/**
+ * FreeRTOS
+ */
+xQueueHandle xQueueLatitude, xQueueLongitude, xQueueAccuracy;
 // void printGNSSData(void);
 void task_get_rtcm_wifi(void *pvParameters);
 void task_send_rtk_ble(void *pvParameters);
+void xQueueSetup(void);
 
 void setup() {
     #ifdef DEBUGGING
@@ -203,9 +209,10 @@ void setup() {
     connectToWiFiAP(ssid, key);
     }
     
-    xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 12, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-    xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-    xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    xQueueSetup();
+    xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
     String thisBoard= ARDUINO_BOARD;
     DEBUG_SERIAL.print(F("Setup done on "));
@@ -247,23 +254,26 @@ void getPosition() {
     lastTime = millis(); //Update the timer
 
     long latitude = myGNSS.getLatitude();
-    Serial.print(F("Lat: "));
-    Serial.print(latitude);
+    xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
+    // DEBUG_SERIAL.print(F("Lat: "));
+    // DEBUG_SERIAL.print(latitude);
 
     long longitude = myGNSS.getLongitude();
-    Serial.print(F(" Long: "));
-    Serial.print(longitude);
-    Serial.print(F(" (degrees * 10^-7)"));
+    xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
+    // DEBUG_SERIAL.print(F(" Long: "));
+    // DEBUG_SERIAL.print(longitude);
+    // DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
 
-    long altitude = myGNSS.getAltitude();
-    Serial.print(F(" Alt: "));
-    Serial.print(altitude);
-    Serial.print(F(" (mm)"));
+    // long altitude = myGNSS.getAltitude();
+    // DEBUG_SERIAL.print(F("Alt: "));
+    // DEBUG_SERIAL.print(altitude);
+    // DEBUG_SERIAL.println(F(" (mm)"));
 
     long accuracy = myGNSS.getPositionAccuracy();
-    Serial.print(F(" 3D Positional Accuracy: "));
-    Serial.print(accuracy);
-    Serial.println(F(" (mm)"));
+    xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
+    // DEBUG_SERIAL.print(F("3D Positional Accuracy: "));
+    // DEBUG_SERIAL.print(accuracy);
+    // DEBUG_SERIAL.println(F(" (mm)"));
   }
 }
 
@@ -306,7 +316,7 @@ void task_get_rtcm_wifi(void *pvParameters) {
     WiFiClient ntripClient;
     long rtcmCount = 0;
 
-    while (1) {
+    while (true) {
 
       if (ntripClient.connected() == false)
       {
@@ -383,7 +393,7 @@ void task_get_rtcm_wifi(void *pvParameters) {
             {
               Serial.println(F("Caster timed out!"));
               ntripClient.stop();
-              // return;
+            
             }
             delay(10);
           }
@@ -450,10 +460,10 @@ void task_get_rtcm_wifi(void *pvParameters) {
           Serial.println(rtcmCount);
           // myGNSS.checkUblox();
           getPosition();
-                  // Measure stack size (last was 19320)
-        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
-        DEBUG_SERIAL.println(uxHighWaterMark);
+                  // Measure stack size (last was 7420)
+        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.println(uxHighWaterMark);
         }
       }
 
@@ -510,7 +520,7 @@ void setupBLE(void)
                                          // We only use notify characteristic
                                        );
 
-    // pCharacteristicPositioning->addDescriptor(new BLE2902());
+    pCharacteristicPositioning->addDescriptor(new BLE2902());
     // pCharacteristicPositioning->setCallbacks(new MyCharacteristicCallbacks());
     // pCharacteristicPositioning->setValue(deviceName.c_str());
 
@@ -543,15 +553,69 @@ void setupBNO080()
     // bno080.enableStepCounter(32);
 }
 
+void xQueueSetup() {
+  xQueueLatitude  = xQueueCreate( 2, sizeof( long ) );
+  xQueueLongitude = xQueueCreate( 2, sizeof( long ) );
+  xQueueAccuracy  = xQueueCreate( 2, sizeof( long ) );
+}
+
 void task_send_rtk_ble(void *pvParameters) {
   (void)pvParameters;
   while (!bleConnected) {
     DEBUG_SERIAL.println(F("Waiting for BLE connection"));
     delay(1000);
     }
-  String dataStr((char *)0);
+  String latLongStr((char *)0);
+  String accuracyMmStr((char *)0);
   // Latitude: 9, delimiter: 1, longitude: 9, delimiter: 1, accuracy: 3
-    // dataStr.reserve(23);
+  latLongStr.reserve(20);
+  accuracyMmStr.reserve(5);
+  long latitude, longitude, accuracy;
+
+  UBaseType_t uxHighWaterMark;
+  // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+  // DEBUG_SERIAL.print(F("task_send_rtk_ble setup, uxHighWaterMark: "));
+  // DEBUG_SERIAL.println(uxHighWaterMark);
+
+  while (true) {
+    while (bleConnected) {
+      if (xQueueReceive( xQueueLatitude, &latitude, portMAX_DELAY ) == pdPASS) {
+        DEBUG_SERIAL.print("Received latitude = ");
+        DEBUG_SERIAL.println(latitude);
+      }
+      if (xQueueReceive( xQueueLongitude, &longitude, portMAX_DELAY ) == pdPASS) {
+        DEBUG_SERIAL.print( "Received longitude = ");
+        DEBUG_SERIAL.print(longitude);
+        DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
+      }
+      if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) {
+        DEBUG_SERIAL.print( "Received accuracy = ");
+        DEBUG_SERIAL.print(accuracy);
+        DEBUG_SERIAL.println(F(" (mm)"));
+        // Send position if accuracy is better than 10 cm
+        if (accuracy < 100) {
+          latLongStr = String(latitude);
+          latLongStr +=",";
+          latLongStr += String(longitude);
+          pCharacteristicPositioning->setValue(latLongStr.c_str());
+          pCharacteristicPositioning->notify();
+          DEBUG_SERIAL.print(F("BLE Sent: "));
+          DEBUG_SERIAL.println(latLongStr);
+        }
+      }
+      taskYIELD();
+      // Measure stack size (last was 10300)
+      // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      // DEBUG_SERIAL.print(F("task_send_rtk_ble loop, uxHighWaterMark: "));
+      // DEBUG_SERIAL.println(uxHighWaterMark);
+
+    } // while (bleConnected) ends 
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+
+  } // while (true) ends
+  
+  // Delete self task
+  vTaskDelete(NULL);
 }
 
 void task_send_bno080_ble(void *pvParameters) {
@@ -569,7 +633,7 @@ void task_send_bno080_ble(void *pvParameters) {
     dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
     
     // Measure stack size
-    // UBaseType_t uxHighWaterMark;
+    UBaseType_t uxHighWaterMark;
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DEBUG_SERIAL.print(F("task_send_bno080_ble setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
