@@ -267,13 +267,13 @@ void getPosition() {
     // long altitude = myGNSS.getAltitude();
     // DEBUG_SERIAL.print(F("Alt: "));
     // DEBUG_SERIAL.print(altitude);
-    // DEBUG_SERIAL.println(F(" (mm)"));
+    // DEBUG_SERIAL.println(F(" mm"));
 
     long accuracy = myGNSS.getPositionAccuracy();
     xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
     // DEBUG_SERIAL.print(F("3D Positional Accuracy: "));
     // DEBUG_SERIAL.print(accuracy);
-    // DEBUG_SERIAL.println(F(" (mm)"));
+    // DEBUG_SERIAL.println(F(" mm"));
   }
 }
 
@@ -610,7 +610,7 @@ void task_send_rtk_ble(void *pvParameters) {
       if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) {
         DEBUG_SERIAL.print( "Received accuracy = ");
         DEBUG_SERIAL.print(accuracy);
-        DEBUG_SERIAL.println(F(" (mm)"));
+        DEBUG_SERIAL.println(F(" mm"));
         // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
         if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) {
           accuracyStr = String(accuracy);
