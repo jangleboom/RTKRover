@@ -80,9 +80,9 @@ float bleConnected = false; // TODO: deglobalize this
 
 class MyCharacteristicCallbacks: public BLECharacteristicCallbacks 
 {
-    void onWrite(BLECharacteristic *pCharacteristicTracking) 
+    void onWrite(BLECharacteristic *pHeadtrackerCharacteristic) 
     {   
-        std::string value = pCharacteristicTracking->getValue(); // Here I get the commands from the App (client)
+        std::string value = pHeadtrackerCharacteristic->getValue(); // Here I get the commands from the App (client)
 
         if (value.length() > 0) 
         {
@@ -126,19 +126,21 @@ class MyServerCallbacks: public BLEServerCallbacks
     }
 };
 
-BLECharacteristic *pCharacteristicTracking;
-BLECharacteristic *pCharacteristicPositioning;
+BLECharacteristic *pHeadtrackerCharacteristic;
+BLECharacteristic *pRealtimeKinematicsCharacteristic;
+BLECharacteristic *pRTKAccuracyCharacteristic;
+
 void setupBLE(void);
 
 /*******************************************************************************
  *                                 BNO080
  * ****************************************************************************/
-bool sendYaw = true;
-bool sendPitch = true;
-bool sendRoll = false;
-bool sendLinAccX = false;
-bool sendLinAccY = false;
-bool sendLinAccZ = false;
+// bool sendYaw = true;
+// bool sendPitch = true;
+// bool sendRoll = false;
+// bool sendLinAccX = false;
+// bool sendLinAccY = false;
+// bool sendLinAccZ = false;
 
 BNO080 bno080;
 
@@ -158,8 +160,6 @@ long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox m
 #include <Base64.h> //nfriendly library from https://github.com/adamvr/arduino-base64, will work with any platform
 #endif
 
-long lastReceivedRTCM_ms = 0; //5 RTCM messages take approximately ~300ms to arrive at 115200bps
-int maxTimeBeforeHangup_ms = 10000; //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
 
 SFE_UBLOX_GNSS myGNSS;
 
@@ -188,7 +188,7 @@ void setup() {
     DEBUG_SERIAL.print(F("Device name: "));
     DEBUG_SERIAL.println(deviceName);
     DEBUG_SERIAL.print(F("Battery: "));
-    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power
+    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power or inApp notification
     DEBUG_SERIAL.println(" V");
 
     button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
@@ -250,7 +250,7 @@ void setupGNSS() {
 
 void getPosition() {
   static long lastRun = millis();
-  if (millis() - lastRun > 1000) {
+  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) {
     lastTime = millis(); //Update the timer
 
     long latitude = myGNSS.getLatitude();
@@ -301,12 +301,16 @@ void connectToWiFiAP(const String& ssid, const String& key) {
 
 void task_get_rtcm_wifi(void *pvParameters) {
     (void)pvParameters;
+    // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
+    long lastReceivedRTCM_ms = 0; 
+    //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
+    const int maxTimeBeforeHangup_ms = 10000; 
 
     while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) {
         DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
-    Wire1.setClock(I2C_FREQUENCY_100K);
+    Wire1.setClock(I2C_FREQUENCY_400K);
     setupGNSS();
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
@@ -317,26 +321,26 @@ void task_get_rtcm_wifi(void *pvParameters) {
     long rtcmCount = 0;
 
     while (true) {
-
+      taskStart:
       if (ntripClient.connected() == false)
       {
-        Serial.print(F("Opening socket to "));
-        Serial.println(casterHost);
+        DEBUG_SERIAL.print(F("Opening socket to "));
+        DEBUG_SERIAL.println(casterHost);
 
         if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
         {
-          Serial.println(F("Connection to caster failed"));
-          // return;
+          DEBUG_SERIAL.println(F("Connection to caster failed"));
+          goto taskStart;// return;
         }
         else
         {
-          Serial.print(F("Connected to "));
-          Serial.print(casterHost);
-          Serial.print(F(": "));
-          Serial.println(casterPort);
+          DEBUG_SERIAL.print(F("Connected to "));
+          DEBUG_SERIAL.print(casterHost);
+          DEBUG_SERIAL.print(F(": "));
+          DEBUG_SERIAL.println(casterPort);
 
-          Serial.print(F("Requesting NTRIP Data from mount point "));
-          Serial.println(mountPoint);
+          DEBUG_SERIAL.print(F("Requesting NTRIP Data from mount point "));
+          DEBUG_SERIAL.println(mountPoint);
 
           const int SERVER_BUFFER_SIZE  = 512;
           char serverRequest[SERVER_BUFFER_SIZE];
@@ -355,8 +359,8 @@ void task_get_rtcm_wifi(void *pvParameters) {
             char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
             snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
 
-            Serial.print(F("Sending credentials: "));
-            Serial.println(userCredentials);
+            DEBUG_SERIAL.print(F("Sending credentials: "));
+            DEBUG_SERIAL.println(userCredentials);
 
   #if defined(ARDUINO_ARCH_ESP32)
             //Encode with ESP32 built-in library
@@ -375,14 +379,14 @@ void task_get_rtcm_wifi(void *pvParameters) {
           strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
           strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
 
-          Serial.print(F("serverRequest size: "));
-          Serial.print(strlen(serverRequest));
-          Serial.print(F(" of "));
-          Serial.print(sizeof(serverRequest));
-          Serial.println(F(" bytes available"));
+          DEBUG_SERIAL.print(F("serverRequest size: "));
+          DEBUG_SERIAL.print(strlen(serverRequest));
+          DEBUG_SERIAL.print(F(" of "));
+          DEBUG_SERIAL.print(sizeof(serverRequest));
+          DEBUG_SERIAL.println(F(" bytes available"));
 
-          Serial.println(F("Sending server request:"));
-          Serial.println(serverRequest);
+          DEBUG_SERIAL.println(F("Sending server request:"));
+          DEBUG_SERIAL.println(serverRequest);
           ntripClient.write(serverRequest, strlen(serverRequest));
 
           //Wait for response
@@ -417,21 +421,21 @@ void task_get_rtcm_wifi(void *pvParameters) {
           }
           response[responseSpot] = '\0';
 
-          Serial.print(F("Caster responded with: "));
-          Serial.println(response);
+          DEBUG_SERIAL.print(F("Caster responded with: "));
+          DEBUG_SERIAL.println(response);
 
           if (connectionSuccess == false)
           {
-            Serial.print(F("Failed to connect to "));
-            Serial.print(casterHost);
-            Serial.print(F(": "));
-            Serial.println(response);
-            // return;
+            DEBUG_SERIAL.print(F("Failed to connect to "));
+            DEBUG_SERIAL.print(casterHost);
+            DEBUG_SERIAL.print(F(": "));
+            DEBUG_SERIAL.println(response);
+            goto taskStart;// return;
           }
           else
           {
-            Serial.print(F("Connected to "));
-            Serial.println(casterHost);
+            DEBUG_SERIAL.print(F("Connected to "));
+            DEBUG_SERIAL.println(casterHost);
             lastReceivedRTCM_ms = millis(); //Reset timeout
           }
         } //End attempt to connect
@@ -452,15 +456,17 @@ void task_get_rtcm_wifi(void *pvParameters) {
 
         if (rtcmCount > 0)
         {
-          lastReceivedRTCM_ms = millis();
-
           //Push RTCM to GNSS module over I2C
           myGNSS.pushRawData(rtcmData, rtcmCount, false);
-          Serial.print(F("RTCM pushed to ZED: "));
-          Serial.println(rtcmCount);
+          DEBUG_SERIAL.print(F("RTCM pushed to ZED: "));
+          DEBUG_SERIAL.println(rtcmCount);
+          uint32_t currentTime = millis();
+          DEBUG_SERIAL.print(F("Last data before ms: "));
+          DEBUG_SERIAL.println(currentTime - lastReceivedRTCM_ms);
+          lastReceivedRTCM_ms = currentTime;
           // myGNSS.checkUblox();
           getPosition();
-                  // Measure stack size (last was 7420)
+        // Measure stack size (last was 7420)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
         // DEBUG_SERIAL.println(uxHighWaterMark);
@@ -470,10 +476,10 @@ void task_get_rtcm_wifi(void *pvParameters) {
       //Close socket if we don't have new data for 10s
       if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
       {
-        Serial.println(F("RTCM timeout. Disconnecting..."));
+        DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
         if (ntripClient.connected() == true)
           ntripClient.stop();
-        // return;
+        goto taskStart;// return;
       }
 
 
@@ -498,8 +504,8 @@ void setupBLE(void)
     pServer->setCallbacks(new MyServerCallbacks()); 
     BLEService *pService = pServer->createService(SERVICE_UUID);
     // Create characteristics
-    pCharacteristicTracking = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID_BNO080,
+    pHeadtrackerCharacteristic = pService->createCharacteristic(
+                                         HEADTRACKER_CHARACTERISTIC_UUID,
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
@@ -507,22 +513,33 @@ void setupBLE(void)
                                          // We only use notify characteristic
                                        );
 
-    pCharacteristicTracking->addDescriptor(new BLE2902());
-    pCharacteristicTracking->setCallbacks(new MyCharacteristicCallbacks());
-    pCharacteristicTracking->setValue(deviceName.c_str());
-
-    pCharacteristicPositioning = pService->createCharacteristic(
-                                         CHARACTERISTIC_UUID_RTK,
+    pRealtimeKinematicsCharacteristic = pService->createCharacteristic(
+                                         REALTIME_KINEMATICS_CHARACTERISTIC_UUID,
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
                                          BLECharacteristic::PROPERTY_NOTIFY 
                                          // We only use notify characteristic
                                        );
+                                    
+    pRTKAccuracyCharacteristic = pService->createCharacteristic(
+                                RTK_ACCURACY_CHARACTERISTIC_UUID,
+                                //  BLECharacteristic::PROPERTY_READ   |
+                                //  BLECharacteristic::PROPERTY_WRITE  |
+                                //  BLECharacteristic::PROPERTY_INDICATE |
+                                BLECharacteristic::PROPERTY_NOTIFY 
+                                // We only use notify characteristic
+                                );
 
-    pCharacteristicPositioning->addDescriptor(new BLE2902());
-    // pCharacteristicPositioning->setCallbacks(new MyCharacteristicCallbacks());
-    // pCharacteristicPositioning->setValue(deviceName.c_str());
+    pHeadtrackerCharacteristic->addDescriptor(new BLE2902());
+    pHeadtrackerCharacteristic->setCallbacks(new MyCharacteristicCallbacks());
+    pHeadtrackerCharacteristic->setValue(deviceName.c_str());
+
+    pRealtimeKinematicsCharacteristic->addDescriptor(new BLE2902());
+    // pRealtimeKinematicsCharacteristic->setCallbacks(new MyCharacteristicCallbacks());
+    // pRealtimeKinematicsCharacteristic->setValue(deviceName.c_str());
+    
+    pRTKAccuracyCharacteristic->addDescriptor(new BLE2902());
 
     pService->start();
     BLEAdvertising *pAdvertising = pServer->getAdvertising();
@@ -567,9 +584,11 @@ void task_send_rtk_ble(void *pvParameters) {
     }
   String latLongStr((char *)0);
   String accuracyMmStr((char *)0);
+  String accuracyStr((char *)0);
   // Latitude: 9, delimiter: 1, longitude: 9, delimiter: 1, accuracy: 3
   latLongStr.reserve(20);
   accuracyMmStr.reserve(5);
+  accuracyStr.reserve(5);
   long latitude, longitude, accuracy;
 
   UBaseType_t uxHighWaterMark;
@@ -580,27 +599,33 @@ void task_send_rtk_ble(void *pvParameters) {
   while (true) {
     while (bleConnected) {
       if (xQueueReceive( xQueueLatitude, &latitude, portMAX_DELAY ) == pdPASS) {
-        DEBUG_SERIAL.print("Received latitude = ");
-        DEBUG_SERIAL.println(latitude);
+        // DEBUG_SERIAL.print("Received latitude = ");
+        // DEBUG_SERIAL.println(latitude);
       }
       if (xQueueReceive( xQueueLongitude, &longitude, portMAX_DELAY ) == pdPASS) {
-        DEBUG_SERIAL.print( "Received longitude = ");
-        DEBUG_SERIAL.print(longitude);
-        DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
+        // DEBUG_SERIAL.print( "Received longitude = ");
+        // DEBUG_SERIAL.print(longitude);
+        // DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
       }
       if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) {
         DEBUG_SERIAL.print( "Received accuracy = ");
         DEBUG_SERIAL.print(accuracy);
         DEBUG_SERIAL.println(F(" (mm)"));
-        // Send position if accuracy is better than 10 cm
-        if (accuracy < 100) {
+        // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
+        if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) {
+          accuracyStr = String(accuracy);
           latLongStr = String(latitude);
           latLongStr +=",";
           latLongStr += String(longitude);
-          pCharacteristicPositioning->setValue(latLongStr.c_str());
-          pCharacteristicPositioning->notify();
-          DEBUG_SERIAL.print(F("BLE Sent: "));
+          pRealtimeKinematicsCharacteristic->setValue(latLongStr.c_str());
+          pRealtimeKinematicsCharacteristic->notify();
+          pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
+          pRTKAccuracyCharacteristic->notify();
+          DEBUG_SERIAL.print(F("BLE sent lat./long.: "));
           DEBUG_SERIAL.println(latLongStr);
+        } else {
+          DEBUG_SERIAL.print(F("No position data sent! Accuracy bad: "));
+          DEBUG_SERIAL.print(accuracyStr);
         }
       }
       taskYIELD();
@@ -668,8 +693,8 @@ void task_send_bno080_ble(void *pvParameters) {
 
             dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
                     + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
-            pCharacteristicTracking->setValue(dataStr.c_str());
-            pCharacteristicTracking->notify();
+            pHeadtrackerCharacteristic->setValue(dataStr.c_str());
+            pHeadtrackerCharacteristic->notify();
             // DEBUG_SERIAL.println(linAccelZF);      
         } else {
             DEBUG_SERIAL.println(F("Waiting for BNO080 data"));

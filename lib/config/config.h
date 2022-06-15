@@ -41,9 +41,10 @@ uint32_t getChipId(void);
  *                         Default BLE settings
  * ****************************************************************************/
 #define PAYLOAD_BUF_LEN              20
-#define SERVICE_UUID                 "713D0000-503E-4C75-BA94-3148F18D941E"
-#define CHARACTERISTIC_UUID_BNO080   "713D0002-503E-4C75-BA94-3148F18D941E"
-#define CHARACTERISTIC_UUID_RTK      "713D0004-503E-4C75-BA94-3148F18D941E"
+#define SERVICE_UUID                            "713D0000-503E-4C75-BA94-3148F18D941E"
+#define HEADTRACKER_CHARACTERISTIC_UUID         "713D0002-503E-4C75-BA94-3148F18D941E"
+#define REALTIME_KINEMATICS_CHARACTERISTIC_UUID "713D0004-503E-4C75-BA94-3148F18D941E"
+#define RTK_ACCURACY_CHARACTERISTIC_UUID        "713D0006-503E-4C75-BA94-3148F18D941E"
 #define LIN_ACCEL_Z_DECIMAL_DIGITS   2
 #define DATA_STR_DELIMITER           " "
 
@@ -80,8 +81,9 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define GNSS_OVER_WIFI_PRIORITY       2  // GNSS should have a lower priority
 #define BNO080_OVER_BLE_PRIORITY      1  // Headtracking: highest priority
 #define BLE_TASK_INTERVAL_MS          10
-#define WIFI_TASK_INTERVAL_MS         1000
-
+#define RTK_REFRESH_INTERVAL_MS       1000 // Recomended is 1000 (1s)
+#define WIFI_TASK_INTERVAL_MS         100
+#define MIN_ACCEPTABLE_ACCURACY_MM    100 // Device will only send if accuray is better than this
 /*******************************************************************************
  *                         Help Functions
  * ****************************************************************************/
