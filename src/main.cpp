@@ -314,10 +314,9 @@ void task_get_rtcm_wifi(void *pvParameters) {
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
-    if (!setupGNSS()) {
-      while (true) {
-        DEBUG_SERIAL.println("setupGNSS() failed, freezing");
-      }
+    if (!setupGNSS()) 
+      DEBUG_SERIAL.println("setupGNSS() failed, freezing");
+      while (1) {};
     };
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
