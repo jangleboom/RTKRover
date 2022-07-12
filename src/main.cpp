@@ -163,7 +163,7 @@ long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox m
 
 SFE_UBLOX_GNSS myGNSS;
 
-void setupGNSS(void);
+bool setupGNSS(void);
 void beginClient(void);
 void getPosition(void);
 
@@ -234,18 +234,21 @@ void loop() {
  *                                 GNSS
  * ****************************************************************************/
 
-void setupGNSS() {
+bool setupGNSS() {
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false) {
         DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
         delay(1000);
       }
-    
-    myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
-    myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
-    myGNSS.setNavigationFrequency(1); //Set output in Hz.
+    bool response = true;
+    response &= myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
+    response &= myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
+    response &= myGNSS.setNavigationFrequency(1); //Set output in Hz.
+    response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
     #ifdef DEBUGGING
     myGNSS.setNMEAOutputPort(Serial);
     #endif
+
+    return response;
 }
 
 void getPosition() {
@@ -311,7 +314,11 @@ void task_get_rtcm_wifi(void *pvParameters) {
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
-    setupGNSS();
+    if (!setupGNSS()) {
+      while (true) {
+        DEBUG_SERIAL.println("setupGNSS() failed, freezing");
+      }
+    };
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -321,6 +328,12 @@ void task_get_rtcm_wifi(void *pvParameters) {
     long rtcmCount = 0;
 
     while (true) {
+      /** This ist mostl the content beginServing() func from the
+       * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
+       * Because I did not wanted to change the code too much if you want to compare
+       * with the Example14 I used of the evil goto as a replace for the return command.
+       * (A task must not return.)
+       */
       taskStart:
       if (ntripClient.connected() == false)
       {
@@ -330,6 +343,9 @@ void task_get_rtcm_wifi(void *pvParameters) {
         if (ntripClient.connect(casterHost, casterPort) == false) //Attempt connection
         {
           DEBUG_SERIAL.println(F("Connection to caster failed"));
+          /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+          * because return is forbiddden in tasks. This is the only use of goto in this code.
+          */
           goto taskStart;// return;
         }
         else
@@ -430,6 +446,9 @@ void task_get_rtcm_wifi(void *pvParameters) {
             DEBUG_SERIAL.print(casterHost);
             DEBUG_SERIAL.print(F(": "));
             DEBUG_SERIAL.println(response);
+            /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+            * because return is forbiddden in tasks. This is the only use of goto in this code.
+            */
             goto taskStart;// return;
           }
           else
@@ -467,9 +486,9 @@ void task_get_rtcm_wifi(void *pvParameters) {
           // myGNSS.checkUblox();
           getPosition();
         // Measure stack size (last was 7420)
-        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
-        // DEBUG_SERIAL.println(uxHighWaterMark);
+        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
+        DEBUG_SERIAL.println(uxHighWaterMark);
         }
       }
 
@@ -479,15 +498,18 @@ void task_get_rtcm_wifi(void *pvParameters) {
         DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
         if (ntripClient.connected() == true)
           ntripClient.stop();
+        /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+        * because return is forbiddden in tasks. This is the only use of goto in this code.
+        */
         goto taskStart;// return;
       }
 
 
         /************************************************************************/
         // Measure stack size (last was 19320)
-        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
-        // DEBUG_SERIAL.println(uxHighWaterMark);
+        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
+        DEBUG_SERIAL.println(uxHighWaterMark);
         vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
 
     }
