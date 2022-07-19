@@ -1,9 +1,11 @@
-### Headtracker + Real Time Kinematics (RTK Client)
+### RTKRover
+## Headtracker + Real Time Kinematics (RTK Client)
 Hardware used:   
 * Adafruit Feather ESP32 Huzzah 
 * SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
 * SparkFun BNO080 Breakout
 * ublox ANN-MB1 antenna
+* LiPo battery
 
 Infrastructure:
 * WiFi (e. g. a personal hotspot)
