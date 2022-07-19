@@ -314,7 +314,7 @@ void task_get_rtcm_wifi(void *pvParameters) {
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
-    if (!setupGNSS()) 
+    if (!setupGNSS()) {
       DEBUG_SERIAL.println("setupGNSS() failed, freezing");
       while (1) {};
     };
