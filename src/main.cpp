@@ -72,8 +72,11 @@ float getBatteryVolts(void);
 /*******************************************************************************
  *                                 WiFi
  * ****************************************************************************/
+using namespace RTKRoverManager;
+AsyncWebServer server(80);
 
-void connectToWiFiAP(const String& ssid, const String& key);
+
+String scannedSSIDs[MAX_SSIDS];
 
 /*******************************************************************************
  *                                 Bluetooth LE
@@ -179,42 +182,51 @@ void task_send_rtk_ble(void *pvParameters);
 void xQueueSetup(void);
 
 void setup() {
-    #ifdef DEBUGGING
-    Serial.begin(BAUD);
-    while (!Serial) {};
-    #endif
-    Wire.begin();
-    setupBLE();
-    setupBNO080();
+  Wire.begin();
+  #ifdef DEBUGGING
+  Serial.begin(BAUD);
+  while (!Serial) {};
+  #endif
 
-    DEBUG_SERIAL.print(F("Device name: "));
-    DEBUG_SERIAL.println(deviceName);
-    DEBUG_SERIAL.print(F("Battery: "));
-    DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power or inApp notification
-    DEBUG_SERIAL.println(" V");
+  setupBLE();
+  setupBNO080();
 
-    button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, LOW);
+  bool format = false;
+  if (!setupSPIFFS(format)) {
+    DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing"));
+    while (true) {};
+  }
+
+  
+  DEBUG_SERIAL.print(F("Battery: "));
+  DEBUG_SERIAL.print(getBatteryVolts());  // TODO: Buzzer peep tone while low power or inApp notification
+  DEBUG_SERIAL.println(" V");
+  WiFi.setHostname(DEVICE_NAME);
+  // Check if we have credentials for a available network
+  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
+  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
+
+  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
+    setupAPMode(AP_SSID, AP_PASSWORD);
+    delay(500);
+  } else {
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+   delay(500);
+ }
+  startServer(&server);
+
+  button.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
     
-    // TODO: make the WiFi setup a primary task
-    EEPROM.begin(400);
-    // wipeEEPROM();
-    if (!checkWiFiCreds()) {
-        digitalWrite(LED_BUILTIN, HIGH);
-        DEBUG_SERIAL.println(F("No WiFi credentials stored in memory. Loading form..."));
-        while (loadWiFiCredsForm());
-    }  else {
-    // Then log into WiFi
-    String ssid = EEPROM.readString(SSID_ADDR);
-    String key = EEPROM.readString(KEY_ADDR);
-    connectToWiFiAP(ssid, key);
-    }
+
+
+    
     
     xQueueSetup();
-    // xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
     xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-    // xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
     String thisBoard= ARDUINO_BOARD;
     DEBUG_SERIAL.print(F("Setup done on "));
@@ -244,8 +256,8 @@ bool setupGNSS() {
     bool response = true;
     response &= myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
     response &= myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
-    response &= myGNSS.setNavigationFrequency(1); //Set output in Hz.
-    response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
+    response &= myGNSS.setNavigationFrequency(20); //Set output in Hz.
+    // response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
     #ifdef DEBUGGING
     myGNSS.setNMEAOutputPort(Serial);
     #endif
@@ -260,14 +272,14 @@ void getPosition() {
 
     long latitude = myGNSS.getLatitude();
     xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
-    // DEBUG_SERIAL.print(F("Lat: "));
-    // DEBUG_SERIAL.print(latitude);
+    DEBUG_SERIAL.print(F("Lat: "));
+    DEBUG_SERIAL.print(latitude);
 
     long longitude = myGNSS.getLongitude();
     xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
-    // DEBUG_SERIAL.print(F(" Long: "));
-    // DEBUG_SERIAL.print(longitude);
-    // DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
+    DEBUG_SERIAL.print(F(" Long: "));
+    DEBUG_SERIAL.print(longitude);
+    DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
 
     // long altitude = myGNSS.getAltitude();
     // DEBUG_SERIAL.print(F("Alt: "));
@@ -486,10 +498,10 @@ void task_get_rtcm_wifi(void *pvParameters) {
           lastReceivedRTCM_ms = currentTime;
           // myGNSS.checkUblox();
           getPosition();
-        // Measure stack size (last was 7420)
-        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
-        DEBUG_SERIAL.println(uxHighWaterMark);
+        // Measure stack size (last was 2304)
+        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.println(uxHighWaterMark);
         }
       }
 
@@ -508,9 +520,9 @@ void task_get_rtcm_wifi(void *pvParameters) {
 
         /************************************************************************/
         // Measure stack size (last was 19320)
-        uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
-        DEBUG_SERIAL.println(uxHighWaterMark);
+        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        // DEBUG_SERIAL.print(F("task_get_rtcm_wifi loop, uxHighWaterMark: "));
+        // DEBUG_SERIAL.println(uxHighWaterMark);
         vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
 
     }
@@ -748,8 +760,8 @@ void buttonHandler(Button2 &btn)
 {
   if (btn == button) {
     digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println(F("Wiping WiFi credentials from memory..."));
-    wipeEEPROM();
-    while (loadWiFiCredsForm()) {};
+    DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
+    wipeSpiffsFiles();
+    ESP.restart();
   }
 }
