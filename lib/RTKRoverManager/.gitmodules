@@ -1,0 +1,4 @@
+[submodule "lib/ESPAsyncWebServer"]
+	path = lib/ESPAsyncWebServer
+	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
+	branch = master

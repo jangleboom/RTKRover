@@ -20,8 +20,9 @@
  *        - Open address 192.168.4.1 in your browser and set credentials you are 
  *          using for you personal access point on your smartphone
  *        - If the process is done, the LED turns off and the device reboots
- *        - If there are no Wifi credentials stored in the EEPROM, the device 
+ *        - If there are no Wifi credentials stored in the SPIFFS, the device 
  *          will jump in this mode on startup
+ *        - button interupt for BNO080 calibration: bno080.calibrateAll(); 
  * 
  *       How to measure battery:
  *        - First:  Since the ADC2 module is also used by the Wi-Fi, only one of 
@@ -210,9 +211,9 @@ void setup() {
     }
     
     xQueueSetup();
-    xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+    // xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
     xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-    xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+    // xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
     
     String thisBoard= ARDUINO_BOARD;
     DEBUG_SERIAL.print(F("Setup done on "));
@@ -314,7 +315,7 @@ void task_get_rtcm_wifi(void *pvParameters) {
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
-    if (!setupGNSS()) {
+    if (!setupGNSS()) { 
       DEBUG_SERIAL.println("setupGNSS() failed, freezing");
       while (1) {};
     };
@@ -582,7 +583,7 @@ void setupBNO080()
     }
     
     // Activate IMU functionalities
-    //bno080.calibrateAll();
+    
     bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);   
     bno080.enableAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
     bno080.enableLinearAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
