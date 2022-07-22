@@ -1,0 +1,4 @@
+[submodule "RTKRoverManager"]
+	path = lib/RTKRoverManager
+	url = https://github.com/audio-communication-group/RTKRoverManager.git
+	branch = main
