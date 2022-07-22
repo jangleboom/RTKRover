@@ -2,3 +2,7 @@
 	path = lib/RTKRoverManager
 	url = https://github.com/audio-communication-group/RTKRoverManager.git
 	branch = main
+[submodule "lib/ESPAsyncWebServer"]
+	path = lib/ESPAsyncWebServer
+	url = https://github.com/me-no-dev/ESPAsyncWebServer.git
+	branch = master

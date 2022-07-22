@@ -46,8 +46,9 @@
 #include <sdkconfig.h>
 #include <config.h>
 #include <secrets.h>
-#include <WiFiManager.h>
+#include <RTKRoverManager.h>
 
+using namespace RTKRoverManager;
 
 String deviceName = getDeviceName(DEVICE_TYPE);
 
