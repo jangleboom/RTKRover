@@ -4,4 +4,4 @@
 .o
 .a
 .elf
-secrets.h
+CasterSecrets/*

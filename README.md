@@ -19,8 +19,8 @@ Infrastructure:
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
 ````
-#ifndef SECRETS_H
-#define SECRETS_H
+#ifndef CASTER_SECRETS_H
+#define CASTER_SECRETS_H
 // A place for your caster credentials
 
 // RTK2Go MountPoint http://www.rtk2go.com:2101/SNIP::STATUS#uptime
@@ -44,6 +44,6 @@ const char mountPointPW[] = "YOUR_EMLID_USER_PASSWORD";
 
 // Use only one of this choices!
 
-#endif /*** SECRETS_H ***/
+#endif /*** CASTER_SECRETS_H ***/
 
 ````

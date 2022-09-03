@@ -45,7 +45,7 @@
 #include <imumaths.h>
 #include <sdkconfig.h>
 #include <config.h>
-#include <secrets.h>
+#include <CasterSecrets.h>
 #include <RTKRoverManager.h>
 
 using namespace RTKRoverManager;
