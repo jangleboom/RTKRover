@@ -6,6 +6,11 @@ Hardware used:
 * SparkFun BNO080 Breakout
 * ublox ANN-MB1 antenna
 * LiPo battery
+* Push button
+* Resistor 10 k
+* Switch
+
+![plot](./fritzing/RTKRover-bb.png)
 
 Infrastructure:
 * WiFi (e. g. a personal hotspot)

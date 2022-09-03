@@ -223,14 +223,14 @@ void setup() {
 
     
     
-    xQueueSetup();
-    xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-    xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-    xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-    
-    String thisBoard= ARDUINO_BOARD;
-    DEBUG_SERIAL.print(F("Setup done on "));
-    DEBUG_SERIAL.println(thisBoard);
+  xQueueSetup();
+  xTaskCreatePinnedToCore( &task_get_rtcm_wifi, "task_get_rtcm_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_send_bno080_ble, "task_send_bno080_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_send_rtk_ble, "task_send_rtk_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  
+  String thisBoard= ARDUINO_BOARD;
+  DEBUG_SERIAL.print(F("Setup done on "));
+  DEBUG_SERIAL.println(thisBoard);
 }
 
 void loop() {
@@ -428,7 +428,7 @@ void task_get_rtcm_wifi(void *pvParameters) {
               ntripClient.stop();
             
             }
-            delay(10);
+            delay(1000);
           }
 
           //Check reply

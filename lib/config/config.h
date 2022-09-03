@@ -83,7 +83,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define BLE_TASK_INTERVAL_MS          10
 #define RTK_REFRESH_INTERVAL_MS       20 
 #define WIFI_TASK_INTERVAL_MS         100
-#define MIN_ACCEPTABLE_ACCURACY_MM    100 // Device will only send if accuray is better than this
+#define MIN_ACCEPTABLE_ACCURACY_MM    1000 // Device will only send if accuray is better than this
 /*******************************************************************************
  *                         Help Functions
  * ****************************************************************************/
