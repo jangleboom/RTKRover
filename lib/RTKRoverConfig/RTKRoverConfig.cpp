@@ -1,4 +1,4 @@
-#include "config.h"
+#include "RTKRoverConfig.h"
 
 uint32_t getChipId() {
   uint32_t chipId = 0;

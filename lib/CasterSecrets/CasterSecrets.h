@@ -5,9 +5,9 @@
 //RTK2Go MountPoint 1 http://www.rtk2go.com:2101/SNIP::STATUS#uptime
 // Email: mr.markuese@gmail.com
 const char casterHost[] = "rtk2go.com";
-const uint16_t casterPort = 2101;
-// const char mountPoint[] = "HAN_TST"; // Hannover test mountpoint
-const char mountPoint[] = "headtracker2punkt0";     //The mount point you want to push data to
+const uint16_t CASTER_PORT = 2101;
+//const char mountPoint[] = "headtracker2punkt0";     //The mount point you want to push data to
+const char mountPoint[] = "rtkbrieselang";
 const char casterUser[] = "mr.markuese@gmail.com";  //User must provide their own email address to use RTK2Go
 const char casterUserPW[] = "";
 const int CONNECTION_TIMEOUT_MS = 10000;

@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef RTKROVER_CONFIG_H
+#define RTKROVER_CONFIG_H
 #include <Arduino.h>
 
 // Deactivate brown out detection
@@ -84,12 +84,13 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define RTK_REFRESH_INTERVAL_MS       20 
 #define WIFI_TASK_INTERVAL_MS         100
 #define MIN_ACCEPTABLE_ACCURACY_MM    1000 // Device will only send if accuray is better than this
+#define NAVIGATION_FREQUENCY_HZ       20   // 
 /*******************************************************************************
  *                         Help Functions
  * ****************************************************************************/
 
 
-#endif /*** HTRTK_CONFIG_H ***/
+#endif /*** RTKROVER_CONFIG_H ***/
 
 
 
