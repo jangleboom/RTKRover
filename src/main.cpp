@@ -345,7 +345,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
       if (ntripClient.connected() == false)
       {
         DEBUG_SERIAL.print(F("Opening socket to "));
-        DEBUG_SERIAL.println(casterHost);
+        DEBUG_SERIAL.println(casterHost.c_str());
 
         if (ntripClient.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == false) //Attempt connection
         {
@@ -369,13 +369,13 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
           DEBUG_SERIAL.println((uint16_t)casterPort.toInt());
 
           DEBUG_SERIAL.print(F("Requesting NTRIP Data from mount point "));
-          DEBUG_SERIAL.println(mountPoint);
+          DEBUG_SERIAL.println(mountPoint.c_str());
 
-          const int SERVER_BUFFER_SIZE  = 512;
+          const int SERVER_BUFFER_SIZE = 512;
           char serverRequest[SERVER_BUFFER_SIZE];
 
           snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
-                  mountPoint);
+                  mountPoint.c_str());
 
           char credentials[512];
           if (strlen(casterUser.c_str()) == 0)
@@ -385,8 +385,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
           else
           {
             //Pass base64 encoded user:pw
-            char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
-            snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
+            char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
+            snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
 
             DEBUG_SERIAL.print(F("Sending credentials: "));
             DEBUG_SERIAL.println(userCredentials);
@@ -405,8 +405,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
             base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
   #endif
           }
-          strncpy(serverRequest, credentials, SERVER_BUFFER_SIZE);
-          strncpy(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
+          strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
+          strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
 
           DEBUG_SERIAL.print(F("serverRequest size: "));
           DEBUG_SERIAL.print(strlen(serverRequest));
@@ -427,7 +427,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
               ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
               Serial.println(F("Caster timed out!"));
             }
-            vTaskDelay(1000/portTICK_PERIOD_MS);
+            // vTaskDelay(1000/portTICK_PERIOD_MS);
+            delay(1000);
           }
 
           //Check reply
@@ -455,7 +456,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
           if (connectionSuccess == false)
           {
             DEBUG_SERIAL.print(F("Failed to connect to "));
-            DEBUG_SERIAL.print(casterHost);
+            DEBUG_SERIAL.print(casterHost.c_str());
             DEBUG_SERIAL.print(F(": "));
             DEBUG_SERIAL.println(response);
 
@@ -467,7 +468,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
           else
           {
             DEBUG_SERIAL.print(F("Connected to "));
-            DEBUG_SERIAL.println(casterHost);
+            DEBUG_SERIAL.println(casterHost.c_str());
             lastReceivedRTCM_ms = millis(); //Reset timeout
           }
         } //End attempt to connect
