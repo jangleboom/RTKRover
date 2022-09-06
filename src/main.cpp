@@ -325,9 +325,9 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
     credentialsExists &= !casterUser.isEmpty();
     credentialsExists &= !mountPoint.isEmpty();
 
-    while (!credentialsExists) {
-      DEBUG_SERIAL.println("RTK Credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
-      vTaskDelay(1000);
+    if (!credentialsExists) {
+      DEBUG_SERIAL.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      while (true) {};
     }
 
     // WiFiClient ntripClient;
