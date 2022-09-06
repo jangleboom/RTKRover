@@ -5,4 +5,4 @@
 .a
 .elf
 CasterSecrets/*
-lib/*
+# lib/*
