@@ -174,7 +174,7 @@ void xQueueSetup(void);
 WiFiClient ntripClient;
 
 void setup() {
-  Wire.begin();
+  // Wire.begin();
   #ifdef DEBUGGING
   Serial.begin(BAUD);
   while (!Serial) {};
@@ -243,6 +243,8 @@ bool setupGNSS() {
         DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
         delay(1000);
       }
+    Wire1.setClock(I2C_FREQUENCY_400K);
+
     bool response = true;
     response &= myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
     response &= myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
@@ -300,7 +302,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
         DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
-    Wire1.setClock(I2C_FREQUENCY_100K);
+
     if (!setupGNSS()) { 
       DEBUG_SERIAL.println("setupGNSS() failed, freezing");
       while (1) {};
@@ -594,7 +596,7 @@ void setupBLE(void)
 }
 
 void setupBNO080()
-{   
+{   Wire.begin();
     while (!bno080.begin()) {
         // Wait
         delay(1000);
@@ -619,7 +621,7 @@ void xQueueSetup() {
 
 void task_send_rtk_corrections_over_ble(void *pvParameters) {
   (void)pvParameters;
-
+  
   String latLongStr((char *)0);
   String accuracyMmStr((char *)0);
   String accuracyStr((char *)0);
