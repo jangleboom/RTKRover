@@ -216,7 +216,7 @@ void setup() {
   xQueueSetup();
   xTaskCreatePinnedToCore( &task_get_rtk_corrections_over_wifi, "task_get_rtk_corrections_over_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-  xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
   String thisBoard= ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
@@ -668,9 +668,9 @@ void task_send_rtk_corrections_over_ble(void *pvParameters) {
       }
       taskYIELD();
       // Measure stack size (last was 10300)
-      uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      DEBUG_SERIAL.print(F("task_send_rtk_corrections_over_ble loop, uxHighWaterMark: "));
-      DEBUG_SERIAL.println(uxHighWaterMark);
+      // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      // DEBUG_SERIAL.print(F("task_send_rtk_corrections_over_ble loop, uxHighWaterMark: "));
+      // DEBUG_SERIAL.println(uxHighWaterMark);
 
     } // while (bleConnected) ends 
 
