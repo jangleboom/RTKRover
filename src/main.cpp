@@ -197,7 +197,7 @@ void setup() {
   wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
-  
+  // TODO: setupWifi() adden
   WiFi.setHostname(DEVICE_NAME);
   // Check if we have credentials for a available network
   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
@@ -218,7 +218,7 @@ void setup() {
   xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
-  String thisBoard= ARDUINO_BOARD;
+  String thisBoard = ARDUINO_BOARD;
   DEBUG_SERIAL.print(F("Setup done on "));
   DEBUG_SERIAL.println(thisBoard);
 }
@@ -251,7 +251,7 @@ bool setupGNSS() {
     response &= myGNSS.setNavigationFrequency(NAVIGATION_FREQUENCY_HZ); // Set output in Hz.
     response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
     #ifdef DEBUGGING
-    myGNSS.setNMEAOutputPort(Serial);
+    // myGNSS.setNMEAOutputPort(Serial);
     #endif
 
     return response;
@@ -259,10 +259,10 @@ bool setupGNSS() {
 
 void getPosition() {
   static long lastRun = millis();
-  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) {
+  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) { // TODO: play with update rate
     lastTime = millis(); //Update the timer
-
-    long latitude = myGNSS.getLatitude();
+    // TODO: use high precicion funcs ***Hp()
+    long latitude = myGNSS.getHighResLatitude();
     xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
     DEBUG_SERIAL.print(F("Lat: "));
     DEBUG_SERIAL.print(latitude);
@@ -351,16 +351,16 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
 
         if (ntripClient.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == false) //Attempt connection
         {
-          DEBUG_SERIAL.println(F("Connection to caster failed"));
-          
           // First check your WiFi connection
           while (!checkConnectionToWifiStation()) {
-            delay(1000);
+            vTaskDelay(5000/portTICK_PERIOD_MS);
           }
+          DEBUG_SERIAL.println(F("Connection to caster failed, retry in 5s"));
           
           /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-          * because return is forbiddden in tasks. This is the only use of goto in this code.
+          * because return is forbidden in tasks. This is the only use of goto in this code.
           */
+          vTaskDelay(1000/portTICK_PERIOD_MS);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
         else
@@ -462,6 +462,11 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
             DEBUG_SERIAL.print(F(": "));
             DEBUG_SERIAL.println(response);
 
+            // Check your WiFi connection
+            while (!checkConnectionToWifiStation()) {
+              vTaskDelay(5000/portTICK_PERIOD_MS);
+            }
+
             /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
             * because return is forbiddden in tasks. This is the only use of goto in this code.
             */
@@ -515,9 +520,11 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
         if (ntripClient.connected() == true)
           ntripClient.stop();
 
-        // while (!checkConnectionToWifiStation()) {
-        //   delay(1000);
-        // }
+        // Check your WiFi connection
+        while (!checkConnectionToWifiStation()) {
+          vTaskDelay(5000/portTICK_PERIOD_MS);
+        }
+
         /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
         * because return is forbiddden in tasks. This is the only use of goto in this code.
         */  
