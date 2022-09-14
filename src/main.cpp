@@ -74,6 +74,7 @@ float getBatteryVolts(void);
  * ****************************************************************************/
 AsyncWebServer server(80);
 String scannedSSIDs[MAX_SSIDS];
+void setupWifi(void);
 
 /*******************************************************************************
  *                                 Bluetooth LE
@@ -180,6 +181,7 @@ void setup() {
   while (!Serial) {};
   #endif
 
+  setupWifi();
   setupBLE();
   setupBNO080();
 
@@ -197,21 +199,7 @@ void setup() {
   wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
-  // TODO: setupWifi() adden
-  WiFi.setHostname(DEVICE_NAME);
-  // Check if we have credentials for a available network
-  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
-  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
-
-  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
-    setupAPMode(AP_SSID, AP_PASSWORD);
-    delay(500);
-  } else {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
-   delay(500);
- }
-  startServer(&server);
-
+  
   // FreeRTOS
   xQueueSetup();
   xTaskCreatePinnedToCore( &task_get_rtk_corrections_over_wifi, "task_get_rtk_corrections_over_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
@@ -232,6 +220,22 @@ void loop() {
     #endif
 
     wipeButton.loop();
+}
+
+void setupWifi() {
+  WiFi.setHostname(DEVICE_NAME);
+  // Check if we have credentials for a available network
+  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
+  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
+
+  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
+    setupAPMode(AP_SSID, AP_PASSWORD);
+    delay(500);
+  } else {
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+   delay(500);
+ }
+  startServer(&server);
 }
 
 /*******************************************************************************
@@ -293,6 +297,10 @@ void getPosition() {
 void task_get_rtk_corrections_over_wifi(void *pvParameters) {
     (void)pvParameters;
 
+    if (checkConnectionToWifiStation() == false) {
+      setupWifi();
+    }
+ 
     // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
     long lastReceivedRTCM_ms = 0; 
     //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
@@ -346,15 +354,19 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
 
       if (ntripClient.connected() == false)
       {
+        if (checkConnectionToWifiStation() == false) {
+          setupWifi();
+          }
         DEBUG_SERIAL.print(F("Opening socket to "));
         DEBUG_SERIAL.println(casterHost.c_str());
 
         if (ntripClient.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == false) //Attempt connection
         {
           // First check your WiFi connection
-          while (!checkConnectionToWifiStation()) {
-            vTaskDelay(5000/portTICK_PERIOD_MS);
-          }
+          // while (!checkConnectionToWifiStation()) {
+          //   vTaskDelay(5000/portTICK_PERIOD_MS);
+          // }
+
           DEBUG_SERIAL.println(F("Connection to caster failed, retry in 5s"));
           
           /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
@@ -463,8 +475,11 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
             DEBUG_SERIAL.println(response);
 
             // Check your WiFi connection
-            while (!checkConnectionToWifiStation()) {
-              vTaskDelay(5000/portTICK_PERIOD_MS);
+            // while (!checkConnectionToWifiStation()) {
+            //   vTaskDelay(5000/portTICK_PERIOD_MS);
+            // }
+            if (checkConnectionToWifiStation() == false) {
+              setupWifi();
             }
 
             /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
@@ -521,8 +536,11 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
           ntripClient.stop();
 
         // Check your WiFi connection
-        while (!checkConnectionToWifiStation()) {
-          vTaskDelay(5000/portTICK_PERIOD_MS);
+        // while (!checkConnectionToWifiStation()) {
+        //   vTaskDelay(5000/portTICK_PERIOD_MS);
+        // }
+        if (checkConnectionToWifiStation() == false) {
+          setupWifi();
         }
 
         /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
