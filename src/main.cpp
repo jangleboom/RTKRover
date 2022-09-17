@@ -352,7 +352,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
     if (!credentialsExists) 
     {
       DEBUG_SERIAL.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
-      while (true) {};
+      while (true) { delay(1000); };
     }
 
     // WiFiClient ntripClient;
@@ -392,6 +392,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
           */
           vTaskDelay(1000/portTICK_PERIOD_MS);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+          }
         }
         else
         {
@@ -494,7 +495,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
             // Check your WiFi connection
             // while (!checkConnectionToWifiStation()) 
-            {
+            // {
             //   vTaskDelay(5000/portTICK_PERIOD_MS);
             // }
             if (checkConnectionToWifiStation() == false) 
@@ -557,7 +558,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
         // Check your WiFi connection
         // while (!checkConnectionToWifiStation()) 
-        {
+       // {
         //   vTaskDelay(5000/portTICK_PERIOD_MS);
         // }
         if (checkConnectionToWifiStation() == false) 
@@ -572,17 +573,18 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
       }
 
 
-        /************************************************************************/
-        // Measure stack size (last was 19320)
-        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
-        // DEBUG_SERIAL.println(uxHighWaterMark);
-        vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
+      /************************************************************************/
+      // Measure stack size (last was 19320)
+      // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      // DEBUG_SERIAL.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
+      // DEBUG_SERIAL.println(uxHighWaterMark);
+      vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
 
     }
     // Delete self task
     vTaskDelete(NULL);
 }
+
 
 /*******************************************************************************
  *                                 BLE
@@ -643,22 +645,23 @@ void setupBLE(void)
 }
 
 void setupBNO080()
-{   Wire.begin();
-    while (!bno080.begin()) 
-    {
-      // Wait
-      delay(1000);
-      DEBUG_SERIAL.println(F("BNO080 not ready, waiting for I2C..."));
-    }
+{   
+  Wire.begin();
+  while (!bno080.begin()) 
+  {
+    // Wait
+    delay(1000);
+    DEBUG_SERIAL.println(F("BNO080 not ready, waiting for I2C..."));
+  }
     
-    // Activate IMU functionalities
-    
-    bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);   
-    bno080.enableAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
-    bno080.enableLinearAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
-    // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht.. 
-    // --> timeBetweenReports should not be 20 ms ;)  try this: 31.25 Hz
-    // bno080.enableStepCounter(32);
+  // Activate IMU functionalities
+  
+  bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);   
+  bno080.enableAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
+  bno080.enableLinearAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
+  // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht.. 
+  // --> timeBetweenReports should not be 20 ms ;)  try this: 31.25 Hz
+  // bno080.enableStepCounter(32);      
 }
 
 void xQueueSetup() 
