@@ -556,11 +556,6 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
         if (ntripClient.connected() == true)
           ntripClient.stop();
 
-        // Check your WiFi connection
-        // while (!checkConnectionToWifiStation()) 
-       // {
-        //   vTaskDelay(5000/portTICK_PERIOD_MS);
-        // }
         if (checkConnectionToWifiStation() == false) 
         {
           setupWifi();
