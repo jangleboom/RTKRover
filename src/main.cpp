@@ -174,7 +174,8 @@ void xQueueSetup(void);
 // Globals
 WiFiClient ntripClient;
 
-void setup() {
+void setup() 
+{
   // Wire.begin();
   #ifdef DEBUGGING
   Serial.begin(BAUD);
@@ -186,7 +187,8 @@ void setup() {
   setupBNO080();
 
   bool format = false;
-  if (!setupSPIFFS(format)) {
+  if (!setupSPIFFS(format)) 
+  {
     DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing..."));
     while (true) {};
   }
@@ -211,30 +213,34 @@ void setup() {
   DEBUG_SERIAL.println(thisBoard);
 }
 
-void loop() {
-    #ifdef DEBUGGING
-    #ifdef TESTING
-    DEBUG_SERIAL.println(F("Running Tests..."))
-    aunit::TestRunner::run();
-    #endif
-    #endif
+void loop() 
+{
+  #ifdef DEBUGGING
+  #ifdef TESTING
+  DEBUG_SERIAL.println(F("Running Tests..."))
+  aunit::TestRunner::run();
+  #endif
+  #endif
 
-    wipeButton.loop();
+  wipeButton.loop();
 }
 
-void setupWifi() {
+void setupWifi() 
+{
   WiFi.setHostname(DEVICE_NAME);
   // Check if we have credentials for a available network
   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
 
-  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) {
+  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
+  {
     setupAPMode(AP_SSID, AP_PASSWORD);
     delay(500);
-  } else {
+  } else 
+  {
    setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
    delay(500);
- }
+  }
   startServer(&server);
 }
 
@@ -242,11 +248,13 @@ void setupWifi() {
  *                                 GNSS
  * ****************************************************************************/
 
-bool setupGNSS() {
-    while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false) {
-        DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-        delay(1000);
-      }
+bool setupGNSS() 
+{
+    while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
+    {
+      DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
+      delay(1000);
+    }
     Wire1.setClock(I2C_FREQUENCY_400K);
 
     bool response = true;
@@ -261,9 +269,11 @@ bool setupGNSS() {
     return response;
 }
 
-void getPosition() {
+void getPosition() 
+{
   static long lastRun = millis();
-  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) { // TODO: play with update rate
+  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) 
+  { // TODO: play with update rate
     lastTime = millis(); //Update the timer
     // TODO: use high precicion funcs ***Hp()
     long latitude = myGNSS.getHighResLatitude();
@@ -294,10 +304,12 @@ void getPosition() {
  *                                 FreeRTOS
  * ****************************************************************************/
 
-void task_get_rtk_corrections_over_wifi(void *pvParameters) {
+void task_get_rtk_corrections_over_wifi(void *pvParameters) 
+{
     (void)pvParameters;
 
-    if (checkConnectionToWifiStation() == false) {
+    if (checkConnectionToWifiStation() == false) 
+    {
       setupWifi();
     }
  
@@ -306,14 +318,16 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
     //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
     const int maxTimeBeforeHangup_ms = 10000; 
 
-    while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) {
-        DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+    while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
+    {
+      DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
+      vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
-    if (!setupGNSS()) { 
+    if (!setupGNSS()) 
+    { 
       DEBUG_SERIAL.println("setupGNSS() failed, freezing");
-      while (1) {};
+      while (true) {};
     };
 
     // Measure stack size
@@ -335,7 +349,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
     credentialsExists &= !casterUser.isEmpty();
     credentialsExists &= !mountPoint.isEmpty();
 
-    if (!credentialsExists) {
+    if (!credentialsExists) 
+    {
       DEBUG_SERIAL.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
       while (true) {};
     }
@@ -343,7 +358,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
     // WiFiClient ntripClient;
     long rtcmCount = 0;
 
-    while (true) {
+    while (true) 
+    {
       /** This ist mostl the content beginServing() func from the
        * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
        * Because I did not wanted to change the code too much if you want to compare
@@ -354,16 +370,18 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
 
       if (ntripClient.connected() == false)
       {
-        if (checkConnectionToWifiStation() == false) {
+        if (checkConnectionToWifiStation() == false) 
+        {
           setupWifi();
-          }
+        }
         DEBUG_SERIAL.print(F("Opening socket to "));
         DEBUG_SERIAL.println(casterHost.c_str());
 
         if (ntripClient.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == false) //Attempt connection
         {
           // First check your WiFi connection
-          // while (!checkConnectionToWifiStation()) {
+          // while (!checkConnectionToWifiStation()) 
+          {
           //   vTaskDelay(5000/portTICK_PERIOD_MS);
           // }
 
@@ -475,10 +493,12 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
             DEBUG_SERIAL.println(response);
 
             // Check your WiFi connection
-            // while (!checkConnectionToWifiStation()) {
+            // while (!checkConnectionToWifiStation()) 
+            {
             //   vTaskDelay(5000/portTICK_PERIOD_MS);
             // }
-            if (checkConnectionToWifiStation() == false) {
+            if (checkConnectionToWifiStation() == false) 
+            {
               setupWifi();
             }
 
@@ -536,10 +556,12 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters) {
           ntripClient.stop();
 
         // Check your WiFi connection
-        // while (!checkConnectionToWifiStation()) {
+        // while (!checkConnectionToWifiStation()) 
+        {
         //   vTaskDelay(5000/portTICK_PERIOD_MS);
         // }
-        if (checkConnectionToWifiStation() == false) {
+        if (checkConnectionToWifiStation() == false) 
+        {
           setupWifi();
         }
 
@@ -622,10 +644,11 @@ void setupBLE(void)
 
 void setupBNO080()
 {   Wire.begin();
-    while (!bno080.begin()) {
-        // Wait
-        delay(1000);
-        DEBUG_SERIAL.println(F("BNO080 not ready, waiting for I2C..."));
+    while (!bno080.begin()) 
+    {
+      // Wait
+      delay(1000);
+      DEBUG_SERIAL.println(F("BNO080 not ready, waiting for I2C..."));
     }
     
     // Activate IMU functionalities
@@ -638,13 +661,15 @@ void setupBNO080()
     // bno080.enableStepCounter(32);
 }
 
-void xQueueSetup() {
+void xQueueSetup() 
+{
   xQueueLatitude  = xQueueCreate( 2, sizeof( long ) );
   xQueueLongitude = xQueueCreate( 2, sizeof( long ) );
   xQueueAccuracy  = xQueueCreate( 2, sizeof( long ) );
 }
 
-void task_send_rtk_corrections_over_ble(void *pvParameters) {
+void task_send_rtk_corrections_over_ble(void *pvParameters) 
+{
   (void)pvParameters;
   
   String latLongStr((char *)0);
@@ -661,23 +686,29 @@ void task_send_rtk_corrections_over_ble(void *pvParameters) {
   // DEBUG_SERIAL.print(F("task_send_rtk_corrections_over_ble setup, uxHighWaterMark: "));
   // DEBUG_SERIAL.println(uxHighWaterMark);
 
-  while (true) {
-    while (bleConnected) {
-      if (xQueueReceive( xQueueLatitude, &latitude, portMAX_DELAY ) == pdPASS) {
+  while (true) 
+  {
+    while (bleConnected) 
+    {
+      if (xQueueReceive( xQueueLatitude, &latitude, portMAX_DELAY ) == pdPASS) 
+      {
         // DEBUG_SERIAL.print("Received latitude = ");
         // DEBUG_SERIAL.println(latitude);
       }
-      if (xQueueReceive( xQueueLongitude, &longitude, portMAX_DELAY ) == pdPASS) {
+      if (xQueueReceive( xQueueLongitude, &longitude, portMAX_DELAY ) == pdPASS) 
+      {
         // DEBUG_SERIAL.print( "Received longitude = ");
         // DEBUG_SERIAL.print(longitude);
         // DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
       }
-      if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) {
+      if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) 
+      {
         DEBUG_SERIAL.print( "Received accuracy = ");
         DEBUG_SERIAL.print(accuracy);
         DEBUG_SERIAL.println(F(" mm"));
         // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
-        if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) {
+        if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) 
+        {
           accuracyStr = String(accuracy);
           latLongStr = String(latitude);
           latLongStr +=",";
@@ -688,7 +719,8 @@ void task_send_rtk_corrections_over_ble(void *pvParameters) {
           pRTKAccuracyCharacteristic->notify();
           DEBUG_SERIAL.print(F("BLE sent lat./long.: "));
           DEBUG_SERIAL.println(latLongStr);
-        } else {
+        } else 
+        {
           DEBUG_SERIAL.print(F("No position data sent! Accuracy bad: "));
           DEBUG_SERIAL.print(accuracyStr);
         }
@@ -701,7 +733,8 @@ void task_send_rtk_corrections_over_ble(void *pvParameters) {
 
     } // while (bleConnected) ends 
 
-    while (!bleConnected) {
+    while (!bleConnected) 
+    {
       DEBUG_SERIAL.println(F("Waiting for BLE connection"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
@@ -713,13 +746,15 @@ void task_send_rtk_corrections_over_ble(void *pvParameters) {
   vTaskDelete(NULL);
 }
 
-void task_send_bno080_data_over_ble(void *pvParameters) {
+void task_send_bno080_data_over_ble(void *pvParameters) 
+{
     (void)pvParameters;
 
-    while (!bleConnected) {
-        DEBUG_SERIAL.println(F("Waiting for BLE connection"));
-        delay(1000);
-        }
+    while (!bleConnected) 
+    {
+      DEBUG_SERIAL.println(F("Waiting for BLE connection"));
+      delay(1000);
+    }
     
     float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
     int pitchDegree, yawDegree;// rollDegree;
@@ -733,43 +768,47 @@ void task_send_bno080_data_over_ble(void *pvParameters) {
     // DEBUG_SERIAL.print(F("task_send_bno080_data_over_ble setup, uxHighWaterMark: "));
     // DEBUG_SERIAL.println(uxHighWaterMark);
 
-    while (true) {
-        // TODO: Separate reading values from sending values
-        if (bno080.dataAvailable()) 
-        {         
-            quatI = bno080.getQuatI();
-            quatJ = bno080.getQuatJ();
-            quatK = bno080.getQuatK();
-            quatReal = bno080.getQuatReal();       
+    while (true) 
+    {
+      // TODO: Separate reading values from sending values
+      if (bno080.dataAvailable()) 
+      {         
+        quatI = bno080.getQuatI();
+        quatJ = bno080.getQuatJ();
+        quatK = bno080.getQuatK();
+        quatReal = bno080.getQuatReal();       
 
-            imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
-            quat.normalize();
-            imu::Vector<3> q_to_euler = quat.toEuler();     
-            yawDegreeF = q_to_euler.x();
-            yawDegreeF = yawDegreeF * -180.0 / M_PI;   // conversion to Degree
-            if ( yawDegreeF < 0 ) yawDegreeF += 359.0; // convert negative to positive angles
-            yawDegree = (int)(round(yawDegreeF));  
+        imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
+        quat.normalize();
+        imu::Vector<3> q_to_euler = quat.toEuler();     
+        yawDegreeF = q_to_euler.x();
+        yawDegreeF = yawDegreeF * -180.0 / M_PI;   // conversion to Degree
+            
+        if ( yawDegreeF < 0 ) yawDegreeF += 359.0; // convert negative to positive angles
         
-            pitchDegreeF = q_to_euler.z();
-            pitchDegreeF = pitchDegreeF * -180.0 / M_PI;
-            pitchDegree = (int)(round(pitchDegreeF));
+        yawDegree = (int)(round(yawDegreeF));  
+        
+        pitchDegreeF = q_to_euler.z();
+        pitchDegreeF = pitchDegreeF * -180.0 / M_PI;
+        pitchDegree = (int)(round(pitchDegreeF));
 
-            // rollDegreeF = q_to_euler.y();
-            // rollDegreeF = rollDegreeF * -180.0 / M_PI;
-            // rollDegree = (int)(round(rollDegreeF));
+        // rollDegreeF = q_to_euler.y();
+        // rollDegreeF = rollDegreeF * -180.0 / M_PI;
+        // rollDegree = (int)(round(rollDegreeF));
 
-            // Seems to be much slower than bno080.getAccelZ()
-            linAccelZF = bno080.getLinAccelZ();  
+        // Seems to be much slower than bno080.getAccelZ()
+        linAccelZF = bno080.getLinAccelZ();  
 
-            dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
-                    + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
-            pHeadtrackerCharacteristic->setValue(dataStr.c_str());
-            pHeadtrackerCharacteristic->notify();
-            // DEBUG_SERIAL.println(linAccelZF);      
-        } else {
-            DEBUG_SERIAL.println(F("Waiting for BNO080 dataAvailable"));
-            vTaskDelay(1000/portTICK_PERIOD_MS);
-            }
+        dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
+                + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
+        pHeadtrackerCharacteristic->setValue(dataStr.c_str());
+        pHeadtrackerCharacteristic->notify();
+        // DEBUG_SERIAL.println(linAccelZF);      
+        } else 
+        {
+          DEBUG_SERIAL.println(F("Waiting for BNO080 dataAvailable"));
+          vTaskDelay(1000/portTICK_PERIOD_MS);
+        }
         // Measure stack size
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DEBUG_SERIAL.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
@@ -783,17 +822,19 @@ void task_send_bno080_data_over_ble(void *pvParameters) {
 /*******************************************************************************
  *                                 Further system components
  * ****************************************************************************/
-float getBatteryVolts() {
-    // Vout = Dout * Vmax / Dmax 
-    // Because battery volts are higher than Vmax, we use the voltage devider on 
-    // Pin A13 (Huzzah ESP32, it may be different on other boards) 
-    float batteryVolts = 2.0 * (analogRead(BAT_PIN) * 3.3 / 4095.0);
-    return batteryVolts;
+float getBatteryVolts() 
+{
+  // Vout = Dout * Vmax / Dmax 
+  // Because battery volts are higher than Vmax, we use the voltage devider on 
+  // Pin A13 (Huzzah ESP32, it may be different on other boards) 
+  float batteryVolts = 2.0 * (analogRead(BAT_PIN) * 3.3 / 4095.0);
+  return batteryVolts;
 }
 
 void buttonHandler(Button2 &btn) 
 {
-  if (btn == wipeButton) {
+  if (btn == wipeButton) 
+  {
     digitalWrite(LED_BUILTIN, HIGH);
     DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
     wipeSpiffsFiles();
