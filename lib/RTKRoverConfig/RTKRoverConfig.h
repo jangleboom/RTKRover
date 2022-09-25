@@ -1,5 +1,5 @@
-#ifndef RTKROVER_CONFIG_H
-#define RTKROVER_CONFIG_H
+#ifndef RTK_ROVER_CONFIG_H
+#define RTK_ROVER_CONFIG_H
 #include <Arduino.h>
 
 // Deactivate brown out detection
@@ -90,7 +90,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
  * ****************************************************************************/
 
 
-#endif /*** RTKROVER_CONFIG_H ***/
+#endif /*** RTK_ROVER_CONFIG_H ***/
 
 
 
