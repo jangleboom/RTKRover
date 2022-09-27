@@ -12,13 +12,12 @@ uint32_t getChipId() {
 }
 
 String getDeviceName(const String &prefix) 
-{
-  unsigned int prefixLen = prefix.length();
-  unsigned int suffixLen = 6;
-  
+{ 
   String deviceName((char *)0);
   String suffix = String(getChipId(), HEX);
-  suffix.toUpperCase();
+
+  unsigned int prefixLen = prefix.length();
+  unsigned int suffixLen = suffix.length();
   
   deviceName.reserve(prefixLen + suffixLen);
   deviceName += prefix;

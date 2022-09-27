@@ -25,7 +25,7 @@
 /*******************************************************************************
  *                         Default WiFi settings
  * ****************************************************************************/
-#define DEVICE_TYPE                  "RTKRover_"
+#define DEVICE_TYPE                  "rtkrover"
 #define DEFAULT_KEY                  "12345678"
 String getDeviceName(const String &);
 uint32_t getChipId(void);

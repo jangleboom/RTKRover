@@ -71,6 +71,11 @@ void buttonHandler(Button2 &btn);
 */
 // Messure half the battery voltage
 #define BAT_PIN                    A13
+/**
+ * @brief Get the Battery Volts 
+ * 
+ * @return float Battery voltage
+ */
 float getBatteryVolts(void);
 
 /*
@@ -80,6 +85,12 @@ float getBatteryVolts(void);
 */
 AsyncWebServer server(80);
 String scannedSSIDs[MAX_SSIDS];
+/**
+ * @brief Wifi setup func: If no credentials are found on file system, a AP will
+ *        openend. If this is the case you must enter your wifi credentials into 
+ *        the web form (192.168.4.1 is default IP) and reboot.
+ * 
+ */
 void setupWifi(void);
 
 /*
@@ -168,7 +179,17 @@ long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox m
 
 SFE_UBLOX_GNSS myGNSS;
 
+/**
+ * @brief Setup the ZED-F9D to a rover
+ * 
+ * @return true If succeeded
+ * @return false If failed
+ */
 bool setupGNSS(void);
+/**
+ * @brief Start the
+ * 
+ */
 void beginClient(void);
 void getPosition(void);
 
@@ -205,7 +226,7 @@ void setup()
     DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing..."));
     while (true) {};
   }
-  DEBUG_SERIAL.print(F("Device name: "));DEBUG_SERIAL.println(DEVICE_NAME);
+  DEBUG_SERIAL.print(F("Device type: "));DEBUG_SERIAL.println(DEVICE_TYPE);
   
   DEBUG_SERIAL.print(F("Battery: "));
   DEBUG_SERIAL.print(getBatteryVolts());  
@@ -240,7 +261,7 @@ void loop()
 
 void setupWifi() 
 {
-  WiFi.setHostname(DEVICE_NAME);
+  WiFi.setHostname(getDeviceName(DEVICE_TYPE).c_str());
   // Check if we have credentials for a available network
   String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
   String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
@@ -251,7 +272,7 @@ void setupWifi()
     delay(500);
   } else 
   {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), DEVICE_NAME);
+   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), getDeviceName(DEVICE_TYPE).c_str());
    delay(500);
   }
   startServer(&server);
