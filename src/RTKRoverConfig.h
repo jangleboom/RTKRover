@@ -51,7 +51,7 @@
 #define REALTIME_KINEMATICS_CHARACTERISTIC_UUID "713D0004-503E-4C75-BA94-3148F18D941E"
 #define RTK_ACCURACY_CHARACTERISTIC_UUID        "713D0006-503E-4C75-BA94-3148F18D941E"
 #define LIN_ACCEL_Z_DECIMAL_DIGITS   2
-#define DATA_STR_DELIMITER           " "
+#define DATA_STR_DELIMITER           ","
 
 /*
 =================================================================================

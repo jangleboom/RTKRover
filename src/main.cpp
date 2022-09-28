@@ -198,11 +198,44 @@ void getPosition(void);
                                 FreeRTOS
 =================================================================================
 */
+
+typedef struct Coord
+{
+  int32_t coord;
+  int8_t  coordHp;
+} coord_t;
+
+const uint8_t QUEUE_SIZE = 2;
 xQueueHandle xQueueLatitude, xQueueLongitude, xQueueAccuracy;
 
+/**
+ * @brief Task for sending the BNO080 position data to the
+ *        iPhone using BLE
+ * 
+ * @param pvParameters Void pointer, no parameter used here
+ */
 void task_send_bno080_data_over_ble(void *pvParameters);
+
+/**
+ * @brief Task to get the correction data from the caster server
+ *        using WiFi
+ * 
+ * @param pvParameters Void pointer, no parameter used here
+ */
 void task_get_rtk_corrections_over_wifi(void *pvParameters);
+
+/**
+ * @brief Task for sending the corrected location data to the
+ *        iPhone using BLE
+ * 
+ * @param pvParameters Void pointer, no parameter used here
+ */
 void task_send_rtk_corrections_over_ble(void *pvParameters);
+
+/**
+ * @brief Create the queues with the right size
+ * 
+ */
 void xQueueSetup(void);
 
 // Globals
@@ -235,6 +268,10 @@ void setup()
   
   // FreeRTOS
   xQueueSetup();
+/*  
+  The magic numbers are the stack sizes, you have to measure the used size in the task (high value for first run)
+  and after that you can reduce the stack size to an fitting smaller value 
+*/
   xTaskCreatePinnedToCore( &task_get_rtk_corrections_over_wifi, "task_get_rtk_corrections_over_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
@@ -275,28 +312,45 @@ bool setupGNSS()
     // Set output in Hz.
     response &= myGNSS.setNavigationFrequency(NAVIGATION_FREQUENCY_HZ); 
 
+    byte rate = myGNSS.getNavigationFrequency(); //Get the update rate of this module
+    DBG.print("Current update rate: ");
+    DBG.println(rate);
+
     return response;
 }
 
 void getPosition() 
 {
   static long lastRun = millis();
-  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) 
-  { // TODO: play with update rate
+  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) // TODO: play with update rate
+  { 
     lastTime = millis(); //Update the timer
-    // TODO: use high precicion funcs ***Hp()
-    long latitude = myGNSS.getHighResLatitude();
-    xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
+
+    int32_t lat = myGNSS.getHighResLatitude();
+    int8_t latHp = myGNSS.getHighResLatitudeHp();
     DBG.print(F("Lat: "));
-    DBG.print(latitude);
+    DBG.print(lat);
+    DBG.print(DATA_STR_DELIMITER);
+    DBG.print(latHp);
 
-    long longitude = myGNSS.getLongitude();
-    xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
+    coord_t latitude ;//= {.coord = lat, .coordHp = latHp};
+    latitude.coord = lat;
+    latitude.coordHp = latHp;
+    xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
+  
+    int32_t lon = myGNSS.getHighResLongitude();
+    int8_t lonHp = myGNSS.getHighResLongitudeHp();
     DBG.print(F(" Lon: "));
-    DBG.print(longitude);
-    DBG.println(F(" (degrees * 10^-7)"));
+    DBG.print(lon);
+    DBG.print(DATA_STR_DELIMITER);
+    DBG.println(lonHp);
+   
+    coord_t longitude = {.coord = lon, .coordHp = lonHp};
+    DBG.printf("Sending longitude.coord: %d, longitude.coordHp: %d\n", longitude.coord, longitude.coordHp);
+   
+    xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
 
-    long accuracy = myGNSS.getPositionAccuracy();
+    int32_t accuracy = myGNSS.getPositionAccuracy();
     xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
   }
 }
@@ -634,9 +688,9 @@ void setupBNO080()
 
 void xQueueSetup() 
 {
-  xQueueLatitude  = xQueueCreate( 2, sizeof( long ) );
-  xQueueLongitude = xQueueCreate( 2, sizeof( long ) );
-  xQueueAccuracy  = xQueueCreate( 2, sizeof( long ) );
+  xQueueLatitude  = xQueueCreate( QUEUE_SIZE, sizeof( coord_t ) );
+  xQueueLongitude = xQueueCreate( QUEUE_SIZE, sizeof( coord_t ) );
+  xQueueAccuracy  = xQueueCreate( QUEUE_SIZE, sizeof( long ) );
 }
 
 void task_send_rtk_corrections_over_ble(void *pvParameters) 
@@ -644,13 +698,15 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
   (void)pvParameters;
   
   String latLongStr((char *)0);
-  String accuracyMmStr((char *)0);
+  // String accuracyMmStr((char *)0);
   String accuracyStr((char *)0);
-  // Latitude: 9, delimiter: 1, longitude: 9, delimiter: 1, accuracy: 3
-  latLongStr.reserve(20);
-  accuracyMmStr.reserve(5);
-  accuracyStr.reserve(5);
-  long latitude, longitude, accuracy;
+  // Latitude: 9, delimiter: 1, latitudeHp: 2, longitude: 9, delimiter: 1, longitudeHp: 2,
+  latLongStr.reserve(24);
+  // accuracyMmStr.reserve(5);
+  accuracyStr.reserve(5); 
+  coord_t latitude, longitude;
+  int32_t lat, lon, accuracy;
+  int8_t latHp, lonHp;
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -661,26 +717,40 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
   {
     while (bleConnected) 
     {
-      if (xQueueReceive( xQueueLatitude, &latitude, portMAX_DELAY ) == pdPASS) 
+      if (xQueueReceive( xQueueLatitude, &latitude, ( TickType_t ) 10 ) == pdPASS) 
       {
-        // DBG.print("Received latitude = ");
-        // DBG.println(latitude);
+        DBG.print("Received latitude.coord = ");
+        DBG.print(latitude.coord);
+        DBG.print(", latitude.coordHp = ");
+        DBG.println(latitude.coordHp);
+        lat = latitude.coord;
+        latHp = latitude.coordHp;
       }
-      if (xQueueReceive( xQueueLongitude, &longitude, portMAX_DELAY ) == pdPASS) 
+
+      if (xQueueReceive( xQueueLongitude, &longitude, ( TickType_t ) 10 ) == pdPASS) 
       {
-        // DBG.print( "Received longitude = ");
-        // DBG.print(longitude);
-        // DBG.println(F(" (degrees * 10^-7)"));
+        DBG.print("Received longitude.coord = ");
+        DBG.print(longitude.coord);
+        DBG.print(", longitude.coordHp = ");
+        DBG.println(longitude.coordHp);
+        lon = longitude.coord;
+        lonHp = longitude.coordHp;
       }
-      if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) 
+
+      if (xQueueReceive( xQueueAccuracy, &accuracy, ( TickType_t ) 10 ) == pdPASS) 
       {
         // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
         if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) 
         {
           accuracyStr = String(accuracy);
-          latLongStr = String(latitude);
-          latLongStr +=",";
-          latLongStr += String(longitude);
+          
+          latLongStr = String(lat);
+          latLongStr += DATA_STR_DELIMITER;
+          latLongStr += String(latHp);
+          latLongStr += DATA_STR_DELIMITER;
+          latLongStr += String(lon);
+          latLongStr += DATA_STR_DELIMITER;
+          latLongStr += String(lonHp);
           // Send coords
           pRealtimeKinematicsCharacteristic->setValue(latLongStr.c_str());
           pRealtimeKinematicsCharacteristic->notify();
@@ -688,8 +758,8 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
           pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
           pRTKAccuracyCharacteristic->notify();
 
-          DBG.print(F("BLE sent lat./long.: "));
-          DBG.println(latLongStr);
+          // DBG.print(F("BLE sent lat./long.: "));
+          // DBG.println(latLongStr);
         } 
         else 
         {
