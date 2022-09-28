@@ -47,6 +47,7 @@
 #include <RTKRoverConfig.h>
 #include <CasterSecrets.h>
 #include <RTKRoverManager.h>
+#include <TestsRTKRover.h>
 
 using namespace RTKRoverManager;
 
@@ -85,13 +86,6 @@ float getBatteryVolts(void);
 */
 AsyncWebServer server(80);
 String scannedSSIDs[MAX_SSIDS];
-/**
- * @brief Wifi setup func: If no credentials are found on file system, a AP will
- *        openend. If this is the case you must enter your wifi credentials into 
- *        the web form (192.168.4.1 is default IP) and reboot.
- * 
- */
-void setupWifi(void);
 
 /*
 =================================================================================
@@ -108,28 +102,28 @@ class MyCharacteristicCallbacks: public BLECharacteristicCallbacks
 
         if (value.length() > 0) 
         {
-            DEBUG_SERIAL.println(F("*********"));
-            DEBUG_SERIAL.print(F("New value: "));
+            DBG.println(F("*********"));
+            DBG.print(F("New value: "));
             for (int i = 0; i < value.length(); i++)
-                DEBUG_SERIAL.print(value[i]);
+                DBG.print(value[i]);
 
-            DEBUG_SERIAL.println();
-            DEBUG_SERIAL.println(F("*********"));
+            DBG.println();
+            DBG.println(F("*********"));
         }
      }
 
      void onConnect(BLEServer* pServer) 
      {
         bleConnected = true;
-        DEBUG_SERIAL.print(F("bleConnected: "));
-        DEBUG_SERIAL.println(bleConnected);
+        DBG.print(F("bleConnected: "));
+        DBG.println(bleConnected);
      };
 
     void onDisconnect(BLEServer* pServer) 
     {
         bleConnected = false;
-        DEBUG_SERIAL.print(("bleConnected: "));
-        DEBUG_SERIAL.println(bleConnected);
+        DBG.print(("bleConnected: "));
+        DBG.println(bleConnected);
     }
 };
 
@@ -186,11 +180,17 @@ SFE_UBLOX_GNSS myGNSS;
  * @return false If failed
  */
 bool setupGNSS(void);
+
 /**
  * @brief Start the
  * 
  */
 void beginClient(void);
+
+/**
+ * @brief Get the Position
+ * 
+ */
 void getPosition(void);
 
 /*
@@ -216,21 +216,18 @@ void setup()
   while (!Serial) {};
   #endif
 
-  setupWifi();
+  // Init file system
+  if (!setupSPIFFS(FORMAT_SPIFFS_IF_FAILED)) while (true) {}; // Freezing
+  
+  setupWifi(&server);
   setupBLE();
   setupBNO080();
 
-  bool format = false;
-  if (!setupSPIFFS(format)) 
-  {
-    DEBUG_SERIAL.println(F("setupSPIFFS failed, freezing..."));
-    while (true) {};
-  }
-  DEBUG_SERIAL.print(F("Device type: "));DEBUG_SERIAL.println(DEVICE_TYPE);
+  DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   
-  DEBUG_SERIAL.print(F("Battery: "));
-  DEBUG_SERIAL.print(getBatteryVolts());  
-  DEBUG_SERIAL.println(" V");
+  DBG.print(F("Battery: "));
+  DBG.print(getBatteryVolts());  
+  DBG.println(" V");
 
   wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
   pinMode(LED_BUILTIN, OUTPUT);
@@ -243,39 +240,17 @@ void setup()
   xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
   String thisBoard = ARDUINO_BOARD;
-  DEBUG_SERIAL.print(F("Setup done on "));
-  DEBUG_SERIAL.println(thisBoard);
+  DBG.print(F("Setup done on "));
+  DBG.println(thisBoard);
 }
 
 void loop() 
 {
   #ifdef DEBUGGING
-  #ifdef TESTING
-  DEBUG_SERIAL.println(F("Running Tests..."))
   aunit::TestRunner::run();
-  #endif
   #endif
 
   wipeButton.loop();
-}
-
-void setupWifi() 
-{
-  WiFi.setHostname(getDeviceName(DEVICE_TYPE).c_str());
-  // Check if we have credentials for a available network
-  String lastSSID = readFile(SPIFFS, PATH_WIFI_SSID);
-  String lastPassword = readFile(SPIFFS, PATH_WIFI_PASSWORD);
-
-  if (!savedNetworkAvailable(lastSSID) || lastPassword.isEmpty() ) 
-  {
-    setupAPMode(AP_SSID, AP_PASSWORD);
-    delay(500);
-  } else 
-  {
-   setupStationMode(lastSSID.c_str(), lastPassword.c_str(), getDeviceName(DEVICE_TYPE).c_str());
-   delay(500);
-  }
-  startServer(&server);
 }
 
 /*
@@ -287,19 +262,18 @@ bool setupGNSS()
 {
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
-      DEBUG_SERIAL.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
+      DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
       delay(1000);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
 
     bool response = true;
-    response &= myGNSS.setI2COutput(COM_TYPE_UBX); //Turn off NMEA noise
-    response &= myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
-    response &= myGNSS.setNavigationFrequency(NAVIGATION_FREQUENCY_HZ); // Set output in Hz.
-    response &= myGNSS.setHighPrecisionMode(true); // TODO: test this
-    #ifdef DEBUGGING
-    // myGNSS.setNMEAOutputPort(Serial);
-    #endif
+    //Turn off NMEA noise
+    response &= myGNSS.setI2COutput(COM_TYPE_UBX); 
+    //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
+    response &= myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); 
+    // Set output in Hz.
+    response &= myGNSS.setNavigationFrequency(NAVIGATION_FREQUENCY_HZ); 
 
     return response;
 }
@@ -313,25 +287,17 @@ void getPosition()
     // TODO: use high precicion funcs ***Hp()
     long latitude = myGNSS.getHighResLatitude();
     xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
-    DEBUG_SERIAL.print(F("Lat: "));
-    DEBUG_SERIAL.print(latitude);
+    DBG.print(F("Lat: "));
+    DBG.print(latitude);
 
     long longitude = myGNSS.getLongitude();
     xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
-    DEBUG_SERIAL.print(F(" Lon: "));
-    DEBUG_SERIAL.print(longitude);
-    DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
-
-    // long altitude = myGNSS.getAltitude();
-    // DEBUG_SERIAL.print(F("Alt: "));
-    // DEBUG_SERIAL.print(altitude);
-    // DEBUG_SERIAL.println(F(" mm"));
+    DBG.print(F(" Lon: "));
+    DBG.print(longitude);
+    DBG.println(F(" (degrees * 10^-7)"));
 
     long accuracy = myGNSS.getPositionAccuracy();
     xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
-    // DEBUG_SERIAL.print(F("3D Positional Accuracy: "));
-    // DEBUG_SERIAL.print(accuracy);
-    // DEBUG_SERIAL.println(F(" mm"));
   }
 }
 
@@ -344,33 +310,31 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 {
     (void)pvParameters;
 
-    if (checkConnectionToWifiStation() == false) 
-    {
-      setupWifi();
-    }
- 
     // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
     long lastReceivedRTCM_ms = 0; 
     //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
     const int maxTimeBeforeHangup_ms = 10000; 
 
+
+    if (! checkConnectionToWifiStation() ) setupWifi(&server);
+
     while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
     {
-      DEBUG_SERIAL.println(F("I2C for RTK not running, check cable..."));
+      DBG.println(F("I2C for RTK not running, check cable!"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
     if (!setupGNSS()) 
     { 
-      DEBUG_SERIAL.println("setupGNSS() failed, freezing");
+      DBG.println("setupGNSS() failed! Freezing...");
       while (true) {};
     };
 
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DEBUG_SERIAL.print(F("task_get_rtk_corrections_over_wifi setup, uxHighWaterMark: "));
-    // DEBUG_SERIAL.println(uxHighWaterMark);
+    // DBG.print(F("task_get_rtk_corrections_over_wifi setup, uxHighWaterMark: "));
+    // DBG.println(uxHighWaterMark);
 
     // Read credentials
     String casterHost = readFile(SPIFFS, PATH_RTK_CASTER_HOST);
@@ -387,14 +351,14 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
     if (!credentialsExists) 
     {
-      DEBUG_SERIAL.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
-      while (true) { delay(1000); };
+      DBG.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
     }
 
     // WiFiClient ntripClient;
     long rtcmCount = 0;
 
-    while (true) 
+    while (true) // Task loop begins
     {
       /** This ist mostl the content beginServing() func from the
        * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
@@ -406,39 +370,30 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
       if (ntripClient.connected() == false)
       {
-        if (checkConnectionToWifiStation() == false) 
-        {
-          setupWifi();
-        }
-        DEBUG_SERIAL.print(F("Opening socket to "));
-        DEBUG_SERIAL.println(casterHost.c_str());
+        if (! checkConnectionToWifiStation() ) setupWifi(&server);
+        
+        DBG.print(F("Opening socket to "));
+        DBG.println(casterHost.c_str());
 
         if (ntripClient.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == false) //Attempt connection
         {
-          // First check your WiFi connection
-          // while (!checkConnectionToWifiStation()) 
-          {
-          //   vTaskDelay(5000/portTICK_PERIOD_MS);
-          // }
-
-          DEBUG_SERIAL.println(F("Connection to caster failed, retry in 5s"));
+          DBG.println(F("Connection to caster failed, retry in 5s"));
           
           /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
           * because return is forbidden in tasks. This is the only use of goto in this code.
           */
           vTaskDelay(1000/portTICK_PERIOD_MS);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
-          }
         }
         else
         {
-          DEBUG_SERIAL.print(F("Connected to "));
-          DEBUG_SERIAL.print(casterHost.c_str());
-          DEBUG_SERIAL.print(F(": "));
-          DEBUG_SERIAL.println((uint16_t)casterPort.toInt());
+          DBG.print(F("Connected to "));
+          DBG.print(casterHost.c_str());
+          DBG.print(F(": "));
+          DBG.println((uint16_t)casterPort.toInt());
 
-          DEBUG_SERIAL.print(F("Requesting NTRIP Data from mount point "));
-          DEBUG_SERIAL.println(mountPoint.c_str());
+          DBG.print(F("Requesting NTRIP Data from mount point "));
+          DBG.println(mountPoint.c_str());
 
           const int SERVER_BUFFER_SIZE = 512;
           char serverRequest[SERVER_BUFFER_SIZE];
@@ -453,38 +408,38 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
           }
           else
           {
-            //Pass base64 encoded user:pw
-            char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
-            snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
+          //Pass base64 encoded user:pw
+          char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
+          snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
 
-            DEBUG_SERIAL.print(F("Sending credentials: "));
-            DEBUG_SERIAL.println(userCredentials);
+          DBG.print(F("Sending credentials: "));
+          DBG.println(userCredentials);
 
-  #if defined(ARDUINO_ARCH_ESP32)
-            //Encode with ESP32 built-in library
-            base64 b;
-            String strEncodedCredentials = b.encode(userCredentials);
-            char encodedCredentials[strEncodedCredentials.length() + 1];
-            strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
-            snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
+#if defined(ARDUINO_ARCH_ESP32)
+          // Encode with ESP32 built-in library
+          base64 b;
+          String strEncodedCredentials = b.encode(userCredentials);
+          char encodedCredentials[strEncodedCredentials.length() + 1];
+          strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
+          snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
   #else
-            //Encode with nfriendly library
-            int encodedLen = base64_enc_len(strlen(userCredentials));
-            char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
-            base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
+          // Encode with nfriendly library
+          int encodedLen = base64_enc_len(strlen(userCredentials));
+          char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
+          base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
   #endif
           }
           strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
           strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
 
-          DEBUG_SERIAL.print(F("serverRequest size: "));
-          DEBUG_SERIAL.print(strlen(serverRequest));
-          DEBUG_SERIAL.print(F(" of "));
-          DEBUG_SERIAL.print(sizeof(serverRequest));
-          DEBUG_SERIAL.println(F(" bytes available"));
+          DBG.print(F("serverRequest size: "));
+          DBG.print(strlen(serverRequest));
+          DBG.print(F(" of "));
+          DBG.print(sizeof(serverRequest));
+          DBG.println(F(" bytes available"));
 
-          DEBUG_SERIAL.println(F("Sending server request:"));
-          DEBUG_SERIAL.println(serverRequest);
+          DBG.println(F("Sending server request:"));
+          DBG.println(serverRequest);
           ntripClient.write(serverRequest, strlen(serverRequest));
 
           //Wait for response
@@ -496,8 +451,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
               ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
               Serial.println(F("Caster timed out!"));
             }
-            // vTaskDelay(1000/portTICK_PERIOD_MS);
-            delay(1000);
+            vTaskDelay(1000/portTICK_PERIOD_MS);
           }
 
           //Check reply
@@ -513,31 +467,21 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
               connectionSuccess = true;
             if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
             {
-              Serial.println(F("Hey - your credentials look bad! Check you caster username and password."));
+              DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
               connectionSuccess = false;
             }
           }
           response[responseSpot] = '\0';
 
-          DEBUG_SERIAL.print(F("Caster responded with: "));
-          DEBUG_SERIAL.println(response);
+          DBG.print(F("Caster responded with: "));
+          DBG.println(response);
 
           if (connectionSuccess == false)
           {
-            DEBUG_SERIAL.print(F("Failed to connect to "));
-            DEBUG_SERIAL.print(casterHost.c_str());
-            DEBUG_SERIAL.print(F(": "));
-            DEBUG_SERIAL.println(response);
-
-            // Check your WiFi connection
-            // while (!checkConnectionToWifiStation()) 
-            // {
-            //   vTaskDelay(5000/portTICK_PERIOD_MS);
-            // }
-            if (checkConnectionToWifiStation() == false) 
-            {
-              setupWifi();
-            }
+            DBG.print(F("Failed to connect to "));
+            DBG.print(casterHost.c_str());
+            DBG.print(F(": "));
+            DBG.println(response);
 
             /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
             * because return is forbiddden in tasks. This is the only use of goto in this code.
@@ -546,73 +490,68 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
           }
           else
           {
-            DEBUG_SERIAL.print(F("Connected to "));
-            DEBUG_SERIAL.println(casterHost.c_str());
+            DBG.print(F("Connected to "));
+            DBG.println(casterHost.c_str());
             lastReceivedRTCM_ms = millis(); //Reset timeout
           }
-        } //End attempt to connect
-      } //End connected == false
+          } // End attempt to connect
+        } // End connected == false
 
-      if (ntripClient.connected() == true)
-      {
-        uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
-        rtcmCount = 0;
-
-        //Print any available RTCM data
-        while (ntripClient.available())
-        {
-          //DEBUG_SERIAL.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
-          rtcmData[rtcmCount++] = ntripClient.read();
-          if (rtcmCount == sizeof(rtcmData)) break;
-        }
-
-        if (rtcmCount > 0)
-        {
-          //Push RTCM to GNSS module over I2C
-          myGNSS.pushRawData(rtcmData, rtcmCount, false);
-          DEBUG_SERIAL.print(F("RTCM pushed to ZED: "));
-          DEBUG_SERIAL.println(rtcmCount);
-          uint32_t currentTime = millis();
-          DEBUG_SERIAL.print(F("Last data before ms: "));
-          DEBUG_SERIAL.println(currentTime - lastReceivedRTCM_ms);
-          lastReceivedRTCM_ms = currentTime;
-          // myGNSS.checkUblox();
-          getPosition();
-        // Measure stack size (last was 2304)
-        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
-        // DEBUG_SERIAL.println(uxHighWaterMark);
-        }
-      }
-
-      //Close socket if we don't have new data for 10s
-      if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
-      {
-        DEBUG_SERIAL.println(F("RTCM timeout. Disconnecting..."));
         if (ntripClient.connected() == true)
-          ntripClient.stop();
-
-        if (checkConnectionToWifiStation() == false) 
         {
-          setupWifi();
+          uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
+          rtcmCount = 0;
+
+          //Print any available RTCM data
+          while (ntripClient.available())
+          {
+            //DBG.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
+            rtcmData[rtcmCount++] = ntripClient.read();
+            if (rtcmCount == sizeof(rtcmData)) break;
+          }
+
+          if (rtcmCount > 0)
+          {
+            //Push RTCM to GNSS module over I2C
+            myGNSS.pushRawData(rtcmData, rtcmCount, false);
+            DBG.print(F("RTCM pushed to ZED: "));
+            DBG.println(rtcmCount);
+            uint32_t currentTime = millis();
+            DBG.print(F("Last data before ms: "));
+            DBG.println(currentTime - lastReceivedRTCM_ms);
+            lastReceivedRTCM_ms = currentTime;
+            // myGNSS.checkUblox();
+            getPosition();
+            // Measure stack size (last was 2304)
+            // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+            // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
+            // DBG.println(uxHighWaterMark);
+          }
+        }   // End (ntripClient.connected() == true)
+
+        // Close socket if we don't have new data for 10s
+        if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
+        {
+          DBG.println(F("RTCM timeout. Disconnecting..."));
+          if (ntripClient.connected() == true)
+            ntripClient.stop();
+
+          /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+          * because return is forbiddden in tasks. This is the only use of goto in this code.
+          */  
+          goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
 
-        /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-        * because return is forbiddden in tasks. This is the only use of goto in this code.
-        */  
-        goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+        // Measure stack size (last was 19320)
+        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+        // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
+        // DBG.println(uxHighWaterMark);
+        vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
+
       }
-
-      // Measure stack size (last was 19320)
-      // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      // DEBUG_SERIAL.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
-      // DEBUG_SERIAL.println(uxHighWaterMark);
-      vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
-
-    }
-    // Delete self task
-    vTaskDelete(NULL);
-}
+      // Delete self task
+      vTaskDelete(NULL);
+  }
 
 /*
 =================================================================================
@@ -649,8 +588,7 @@ void setupBLE(void)
                                 //  BLECharacteristic::PROPERTY_READ   |
                                 //  BLECharacteristic::PROPERTY_WRITE  |
                                 //  BLECharacteristic::PROPERTY_INDICATE |
-                                BLECharacteristic::PROPERTY_NOTIFY 
-                                // We only use notify characteristic
+                                BLECharacteristic::PROPERTY_NOTIFY // We only use notify characteristic
                                 );
 
     pHeadtrackerCharacteristic->addDescriptor(new BLE2902());
@@ -671,7 +609,7 @@ void setupBLE(void)
     pAdvertising->setMaxPreferred(0x24);  // 30 ms
     //pAdvertising->start();
     BLEDevice::startAdvertising();
-    DEBUG_SERIAL.println(F("Characteristic defined! Now you can read it in your phone!"));
+    DBG.println(F("Characteristic defined! Now you can read it in your phone!"));
 }
 
 void setupBNO080()
@@ -681,7 +619,7 @@ void setupBNO080()
   {
     // Wait
     delay(1000);
-    DEBUG_SERIAL.println(F("BNO080 not ready, waiting for I2C..."));
+    DBG.println(F("BNO080 not ready, waiting for I2C..."));
   }
     
   // Activate IMU functionalities
@@ -716,8 +654,8 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-  // DEBUG_SERIAL.print(F("task_send_rtk_corrections_over_ble setup, uxHighWaterMark: "));
-  // DEBUG_SERIAL.println(uxHighWaterMark);
+  // DBG.print(F("task_send_rtk_corrections_over_ble setup, uxHighWaterMark: "));
+  // DBG.println(uxHighWaterMark);
 
   while (true) 
   {
@@ -725,20 +663,17 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
     {
       if (xQueueReceive( xQueueLatitude, &latitude, portMAX_DELAY ) == pdPASS) 
       {
-        // DEBUG_SERIAL.print("Received latitude = ");
-        // DEBUG_SERIAL.println(latitude);
+        // DBG.print("Received latitude = ");
+        // DBG.println(latitude);
       }
       if (xQueueReceive( xQueueLongitude, &longitude, portMAX_DELAY ) == pdPASS) 
       {
-        // DEBUG_SERIAL.print( "Received longitude = ");
-        // DEBUG_SERIAL.print(longitude);
-        // DEBUG_SERIAL.println(F(" (degrees * 10^-7)"));
+        // DBG.print( "Received longitude = ");
+        // DBG.print(longitude);
+        // DBG.println(F(" (degrees * 10^-7)"));
       }
       if (xQueueReceive( xQueueAccuracy, &accuracy, portMAX_DELAY ) == pdPASS) 
       {
-        DEBUG_SERIAL.print( "Received accuracy = ");
-        DEBUG_SERIAL.print(accuracy);
-        DEBUG_SERIAL.println(F(" mm"));
         // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
         if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) 
         {
@@ -746,29 +681,36 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
           latLongStr = String(latitude);
           latLongStr +=",";
           latLongStr += String(longitude);
+          // Send coords
           pRealtimeKinematicsCharacteristic->setValue(latLongStr.c_str());
           pRealtimeKinematicsCharacteristic->notify();
+          // Send accuracy
           pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
           pRTKAccuracyCharacteristic->notify();
-          DEBUG_SERIAL.print(F("BLE sent lat./long.: "));
-          DEBUG_SERIAL.println(latLongStr);
-        } else 
+
+          DBG.print(F("BLE sent lat./long.: "));
+          DBG.println(latLongStr);
+        } 
+        else 
         {
-          DEBUG_SERIAL.print(F("No position data sent! Accuracy bad: "));
-          DEBUG_SERIAL.print(accuracyStr);
+          DBG.print(F("No position data sent! (Accuracy bad)"));
         }
+
+        DBG.print(F("Received accuracy = "));
+        DBG.print(accuracy);
+        DBG.println(F(" mm"));
       }
       taskYIELD();
       // Measure stack size (last was 10300)
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      // DEBUG_SERIAL.print(F("task_send_rtk_corrections_over_ble loop, uxHighWaterMark: "));
-      // DEBUG_SERIAL.println(uxHighWaterMark);
+      // DBG.print(F("task_send_rtk_corrections_over_ble loop, uxHighWaterMark: "));
+      // DBG.println(uxHighWaterMark);
 
     } // while (bleConnected) ends 
 
     while (!bleConnected) 
     {
-      DEBUG_SERIAL.println(F("Waiting for BLE connection"));
+      DBG.println(F("Waiting for BLE connection"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
@@ -785,7 +727,7 @@ void task_send_bno080_data_over_ble(void *pvParameters)
 
     while (!bleConnected) 
     {
-      DEBUG_SERIAL.println(F("Waiting for BLE connection"));
+      DBG.println(F("Waiting for BLE connection"));
       delay(1000);
     }
     
@@ -798,8 +740,8 @@ void task_send_bno080_data_over_ble(void *pvParameters)
     // Measure stack size
     UBaseType_t uxHighWaterMark;
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DEBUG_SERIAL.print(F("task_send_bno080_data_over_ble setup, uxHighWaterMark: "));
-    // DEBUG_SERIAL.println(uxHighWaterMark);
+    // DBG.print(F("task_send_bno080_data_over_ble setup, uxHighWaterMark: "));
+    // DBG.println(uxHighWaterMark);
 
     while (true) 
     {
@@ -836,16 +778,16 @@ void task_send_bno080_data_over_ble(void *pvParameters)
                 + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
         pHeadtrackerCharacteristic->setValue(dataStr.c_str());
         pHeadtrackerCharacteristic->notify();
-        // DEBUG_SERIAL.println(linAccelZF);      
+        // DBG.println(linAccelZF);      
         } else 
         {
-          DEBUG_SERIAL.println(F("Waiting for BNO080 dataAvailable"));
+          DBG.println(F("Waiting for BNO080 dataAvailable"));
           vTaskDelay(1000/portTICK_PERIOD_MS);
         }
         // Measure stack size
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DEBUG_SERIAL.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
-        // DEBUG_SERIAL.println(uxHighWaterMark);
+        // DBG.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
+        // DBG.println(uxHighWaterMark);
         vTaskDelay(BLE_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
     }
     // Delete self task
@@ -876,7 +818,7 @@ void buttonHandler(Button2 &btn)
   if (btn == wipeButton) 
   {
     digitalWrite(LED_BUILTIN, HIGH);
-    DEBUG_SERIAL.println(F("Wiping WiFi credentials and RTK settings from memory..."));
+    DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
     wipeSpiffsFiles();
     ESP.restart();
   }
