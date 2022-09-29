@@ -251,13 +251,12 @@ void setup()
 
   // Init file system
   if (!setupSPIFFS(FORMAT_SPIFFS_IF_FAILED)) while (true) {}; // Freezing
-  
+
+  setupBNO080();
   setupWifi(&server);
   setupBLE();
-  setupBNO080();
-
-  DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   
+  DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   DBG.print(F("Battery: "));
   DBG.print(getBatteryVolts());  
   DBG.println(" V");
@@ -269,12 +268,18 @@ void setup()
   // FreeRTOS
   xQueueSetup();
 /*  
-  The magic numbers are the stack sizes, you have to measure the used size in the task (high value for first run)
-  and after that you can reduce the stack size to an fitting smaller value 
+  Stack sizes, you have to measure the used size in the task (set a high value for first run) and 
+  after that you can reduce the stack size to an fitting smaller value. This have to repeated if 
+  the task code is changed. There are no rules, just measure and adjust (thats why its a magic number).
+  For measurement you need to uncomment the uxHighWaterMark related code in the task (setup and loop).
+  After measurement comment out it again.
 */
-  xTaskCreatePinnedToCore( &task_get_rtk_corrections_over_wifi, "task_get_rtk_corrections_over_wifi", 1024 * 7, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", 1024 * 11, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-  xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", 1024 * 10, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  int stack_size_task_get_rtk_corrections_over_wifi = 1024 * 7;
+  int stack_size_task_send_bno080_data_over_ble = 1024 * 11;
+  int stack_size_task_send_rtk_corrections_over_ble = 1024 * 10;
+  xTaskCreatePinnedToCore( &task_get_rtk_corrections_over_wifi, "task_get_rtk_corrections_over_wifi", stack_size_task_get_rtk_corrections_over_wifi, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", stack_size_task_send_bno080_data_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", stack_size_task_send_rtk_corrections_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
@@ -300,7 +305,7 @@ bool setupGNSS()
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
       DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-      delay(1000);
+      vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
 
@@ -403,7 +408,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
     if (!credentialsExists) 
     {
-      DBG.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      // DBG.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
       while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
     }
 
@@ -431,11 +436,10 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
         if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
         {
           DBG.println(F("Connection to caster failed, retry in 5s"));
-          
+          vTaskDelay(1000/portTICK_PERIOD_MS);
           /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
           * because return is forbidden in tasks. This is the only use of goto in this code.
           */
-          vTaskDelay(1000/portTICK_PERIOD_MS);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
         else
@@ -798,7 +802,7 @@ void task_send_bno080_data_over_ble(void *pvParameters)
     while (!bleConnected) 
     {
       DBG.println(F("Waiting for BLE connection"));
-      delay(1000);
+      vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     
     float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
