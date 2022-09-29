@@ -333,9 +333,7 @@ void getPosition()
     DBG.print(DATA_STR_DELIMITER);
     DBG.print(latHp);
 
-    coord_t latitude ;//= {.coord = lat, .coordHp = latHp};
-    latitude.coord = lat;
-    latitude.coordHp = latHp;
+    coord_t latitude = {.coord = lat, .coordHp = latHp};
     xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
   
     int32_t lon = myGNSS.getHighResLongitude();
@@ -429,7 +427,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());
 
-        if (ntripClient.connect(casterHost.c_str(), (uint16_t)casterPort.toInt()) == false) //Attempt connection
+        // Attempt connection
+        if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
         {
           DBG.println(F("Connection to caster failed, retry in 5s"));
           
@@ -496,7 +495,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
           DBG.println(serverRequest);
           ntripClient.write(serverRequest, strlen(serverRequest));
 
-          //Wait for response
+          // Wait for response
           unsigned long timeout = millis();
           while (ntripClient.available() == 0)
           {
@@ -504,11 +503,12 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
             {
               ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
               Serial.println(F("Caster timed out!"));
+              goto taskStart;
             }
             vTaskDelay(1000/portTICK_PERIOD_MS);
           }
 
-          //Check reply
+          // Check reply
           bool connectionSuccess = false;
           char response[512];
           int responseSpot = 0;
@@ -804,7 +804,7 @@ void task_send_bno080_data_over_ble(void *pvParameters)
     float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
     int pitchDegree, yawDegree;// rollDegree;
     String dataStr((char *)0);
-    // yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4 + LIN_ACCEL_Z_DECIMAL_DIGITS
+    // String size: (yaw: 3, delimiter: 1, pitch: 3, delimiter: 1, linAccelZF: 4) = 12 + LIN_ACCEL_Z_DECIMAL_DIGITS
     dataStr.reserve(12 + LIN_ACCEL_Z_DECIMAL_DIGITS);
     
     // Measure stack size
