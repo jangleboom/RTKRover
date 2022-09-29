@@ -268,7 +268,7 @@ void setup()
   // FreeRTOS
   xQueueSetup();
 /*  
-  Stack sizes, you have to measure the used size in the task (set a high value for first run) and 
+  Stack sizes of the tasks. You have to measure the used size in the task (set a high value for first run) and 
   after that you can reduce the stack size to an fitting smaller value. This have to repeated if 
   the task code is changed. There are no rules, just measure and adjust (thats why its a magic number).
   For measurement you need to uncomment the uxHighWaterMark related code in the task (setup and loop).
