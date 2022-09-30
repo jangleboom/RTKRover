@@ -253,7 +253,7 @@ void setup()
   if (!setupSPIFFS(FORMAT_SPIFFS_IF_FAILED)) while (true) {}; // Freezing
 
   setupBNO080();
-  setupWifi(&server);
+  // setupWiFi(&server);
   setupBLE();
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
@@ -372,14 +372,13 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
     //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
     const int maxTimeBeforeHangup_ms = 10000; 
 
-
-    if (! checkConnectionToWifiStation() ) setupWifi(&server);
-
     while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
     {
       DBG.println(F("I2C for RTK not running, check cable!"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
+
+    setupWiFi(&server);
 
     if (!setupGNSS()) 
     { 
@@ -408,7 +407,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
     if (!credentialsExists) 
     {
-      // DBG.println("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task. ");
+      DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
       while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
     }
 
@@ -427,8 +426,12 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
       if (ntripClient.connected() == false)
       {
-        if (! checkConnectionToWifiStation() ) setupWifi(&server);
-        
+        while (! checkConnectionToWifiStation() )
+        { 
+          DBG.println(F("task_get_rtk_corrections_over_wifi loop paused, reconnecting WiFi!"));
+          vTaskDelay(3000/portTICK_PERIOD_MS);
+        }
+
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());
 
