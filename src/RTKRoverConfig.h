@@ -13,7 +13,7 @@
 */
 
 //set to true for debug output, false for no debug output
-#define DEBUGGING false 
+#define DEBUGGING true 
 #define DBG \
   if (DEBUGGING) Serial
 
@@ -87,8 +87,9 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define RUNNING_CORE_1                1     // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define GNSS_OVER_WIFI_PRIORITY       2     // GNSS should have a lower priority
-#define BNO080_OVER_BLE_PRIORITY      1     // Headtracking: highest priority
+#define RTK_OVER_WIFI_PRIORITY        2     // GNSS should have a lower priority than BNO080 data transmission
+#define BNO080_OVER_BLE_PRIORITY      1     // Headtracking: highest priority for immersive audio
+#define RTK_OVER_BLE_PRIORITY         2     // Real Time Kinematics data to iOS app, (should not break head tracking)
 #define BLE_TASK_INTERVAL_MS          10
 #define RTK_REFRESH_INTERVAL_MS       20 
 #define WIFI_TASK_INTERVAL_MS         100

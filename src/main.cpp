@@ -209,20 +209,12 @@ const uint8_t QUEUE_SIZE = 2;
 xQueueHandle xQueueLatitude, xQueueLongitude, xQueueAccuracy;
 
 /**
- * @brief Task for sending the BNO080 position data to the
- *        iPhone using BLE
- * 
- * @param pvParameters Void pointer, no parameter used here
- */
-void task_send_bno080_data_over_ble(void *pvParameters);
-
-/**
  * @brief Task to get the correction data from the caster server
  *        using WiFi
  * 
  * @param pvParameters Void pointer, no parameter used here
  */
-void task_get_rtk_corrections_over_wifi(void *pvParameters);
+void task_get_rtk_data_over_wifi(void *pvParameters);
 
 /**
  * @brief Task for sending the corrected location data to the
@@ -230,7 +222,15 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters);
  * 
  * @param pvParameters Void pointer, no parameter used here
  */
-void task_send_rtk_corrections_over_ble(void *pvParameters);
+void task_send_rtk_data_over_ble(void *pvParameters);
+
+/**
+ * @brief Task for sending the BNO080 position data to the
+ *        iPhone using BLE
+ * 
+ * @param pvParameters Void pointer, no parameter used here
+ */
+void task_send_bno080_data_over_ble(void *pvParameters);
 
 /**
  * @brief Create the queues with the right size
@@ -274,12 +274,12 @@ void setup()
   For measurement you need to uncomment the uxHighWaterMark related code in the task (setup and loop).
   After measurement comment out it again.
 */
-  int stack_size_task_get_rtk_corrections_over_wifi = 1024 * 7;
+  int stack_size_task_get_rtk_data_over_wifi = 1024 * 7;
   int stack_size_task_send_bno080_data_over_ble = 1024 * 11;
-  int stack_size_task_send_rtk_corrections_over_ble = 1024 * 10;
-  xTaskCreatePinnedToCore( &task_get_rtk_corrections_over_wifi, "task_get_rtk_corrections_over_wifi", stack_size_task_get_rtk_corrections_over_wifi, NULL, GNSS_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  int stack_size_task_send_rtk_data_over_ble = 1024 * 10;
+  xTaskCreatePinnedToCore( &task_get_rtk_data_over_wifi, "task_get_rtk_data_over_wifi", stack_size_task_get_rtk_data_over_wifi, NULL, RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", stack_size_task_send_bno080_data_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-  xTaskCreatePinnedToCore( &task_send_rtk_corrections_over_ble, "task_send_rtk_corrections_over_ble", stack_size_task_send_rtk_corrections_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_send_rtk_data_over_ble, "task_send_rtk_data_over_ble", stack_size_task_send_rtk_data_over_ble, NULL, RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
@@ -329,11 +329,11 @@ void getPosition()
   static long lastRun = millis();
   if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) // TODO: play with update rate
   { 
-    lastTime = millis(); //Update the timer
-
+    lastTime = millis(); // Update the timer
+    myGNSS.checkUblox();
     int32_t lat = myGNSS.getHighResLatitude();
     int8_t latHp = myGNSS.getHighResLatitudeHp();
-    DBG.print(F("Lat: "));
+    DBG.print(F("Lat.: "));
     DBG.print(lat);
     DBG.print(DATA_STR_DELIMITER);
     DBG.print(latHp);
@@ -343,13 +343,13 @@ void getPosition()
   
     int32_t lon = myGNSS.getHighResLongitude();
     int8_t lonHp = myGNSS.getHighResLongitudeHp();
-    DBG.print(F(" Lon: "));
+    DBG.print(F(" Lon.: "));
     DBG.print(lon);
     DBG.print(DATA_STR_DELIMITER);
     DBG.println(lonHp);
    
     coord_t longitude = {.coord = lon, .coordHp = lonHp};
-    DBG.printf("Sending longitude.coord: %d, longitude.coordHp: %d\n", longitude.coord, longitude.coordHp);
+    DBG.printf("Sending to queue, longitude.coord: %d, longitude.coordHp: %d\n", longitude.coord, longitude.coordHp);
    
     xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
 
@@ -416,7 +416,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
     while (true) // Task loop begins
     {
-      /** This ist mostl the content beginServing() func from the
+      /** This ist most of the content beginServing() func from the
        * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
        * Because I did not wanted to change the code too much if you want to compare
        * with the Example14 I used of the evil goto as a replace for the return command.
@@ -426,11 +426,8 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
 
       if (ntripClient.connected() == false)
       {
-        while (! checkConnectionToWifiStation() )
-        { 
-          DBG.println(F("task_get_rtk_corrections_over_wifi loop paused, reconnecting WiFi!"));
-          vTaskDelay(3000/portTICK_PERIOD_MS);
-        }
+        // First check WiFi connection
+        while (! checkConnectionToWifiStation() ) {};
 
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());
@@ -524,9 +521,9 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
             if (responseSpot == sizeof(response) - 1) break;
 
             response[responseSpot++] = ntripClient.read();
-            if (strstr(response, "200") > 0) //Look for 'ICY 200 OK'
+            if (strstr(response, "200") > 0) // Look for 'ICY 200 OK'
               connectionSuccess = true;
-            if (strstr(response, "401") > 0) //Look for '401 Unauthorized'
+            if (strstr(response, "401") > 0) // Look for '401 Unauthorized'
             {
               DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
               connectionSuccess = false;
@@ -553,20 +550,20 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
           {
             DBG.print(F("Connected to "));
             DBG.println(casterHost.c_str());
-            lastReceivedRTCM_ms = millis(); //Reset timeout
+            lastReceivedRTCM_ms = millis(); // Reset timeout
           }
           } // End attempt to connect
         } // End connected == false
 
         if (ntripClient.connected() == true)
         {
-          uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
+          uint8_t rtcmData[512 * 4]; // Most incoming data is around 500 bytes but may be larger
           rtcmCount = 0;
 
           //Print any available RTCM data
           while (ntripClient.available())
           {
-            //DBG.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data
+            //DBG.write(ntripClient.read()); // Pipe to serial port is fine but beware, it's a lot of binary data
             rtcmData[rtcmCount++] = ntripClient.read();
             if (rtcmCount == sizeof(rtcmData)) break;
           }
@@ -581,7 +578,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
             DBG.print(F("Last data before ms: "));
             DBG.println(currentTime - lastReceivedRTCM_ms);
             lastReceivedRTCM_ms = currentTime;
-            // myGNSS.checkUblox();
+            
             getPosition();
             // Measure stack size (last was 2304)
             // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -700,7 +697,7 @@ void xQueueSetup()
   xQueueAccuracy  = xQueueCreate( QUEUE_SIZE, sizeof( long ) );
 }
 
-void task_send_rtk_corrections_over_ble(void *pvParameters) 
+void task_send_rtk_data_over_ble(void *pvParameters) 
 {
   (void)pvParameters;
   
@@ -717,7 +714,7 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-  // DBG.print(F("task_send_rtk_corrections_over_ble setup, uxHighWaterMark: "));
+  // DBG.print(F("task_send_rtk_data_over_ble setup, uxHighWaterMark: "));
   // DBG.println(uxHighWaterMark);
 
   while (true) 
@@ -780,7 +777,7 @@ void task_send_rtk_corrections_over_ble(void *pvParameters)
       taskYIELD();
       // Measure stack size (last was 10300)
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      // DBG.print(F("task_send_rtk_corrections_over_ble loop, uxHighWaterMark: "));
+      // DBG.print(F("task_send_rtk_data_over_ble loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
     } // while (bleConnected) ends 
