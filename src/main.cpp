@@ -162,8 +162,8 @@ void setupBNO080(void);
 */
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
 
-//The ESP32 core has a built in base64 library but not every platform does
-//We'll use an external lib if necessary.
+// The ESP32 core has a built in base64 library but not every platform does
+// We'll use an external lib if necessary.
 #if defined(ARDUINO_ARCH_ESP32)
 #include "base64.h" //Built-in ESP32 library
 #else
@@ -253,7 +253,6 @@ void setup()
   if (!setupSPIFFS(FORMAT_SPIFFS_IF_FAILED)) while (true) {}; // Freezing
 
   setupBNO080();
-  // setupWiFi(&server);
   setupBLE();
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
@@ -274,9 +273,9 @@ void setup()
   For measurement you need to uncomment the uxHighWaterMark related code in the task (setup and loop).
   After measurement comment out it again.
 */
-  int stack_size_task_get_rtk_data_over_wifi = 1024 * 7;
-  int stack_size_task_send_bno080_data_over_ble = 1024 * 11;
-  int stack_size_task_send_rtk_data_over_ble = 1024 * 10;
+  int stack_size_task_get_rtk_data_over_wifi = 1024 * 7;      // Last measurement: 
+  int stack_size_task_send_bno080_data_over_ble = 1024 * 11;  // Last measurement:
+  int stack_size_task_send_rtk_data_over_ble = 1024 * 10;     // Last measurement: 9480
   xTaskCreatePinnedToCore( &task_get_rtk_data_over_wifi, "task_get_rtk_data_over_wifi", stack_size_task_get_rtk_data_over_wifi, NULL, RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", stack_size_task_send_bno080_data_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_data_over_ble, "task_send_rtk_data_over_ble", stack_size_task_send_rtk_data_over_ble, NULL, RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
@@ -327,7 +326,7 @@ bool setupGNSS()
 void getPosition() 
 {
   static long lastRun = millis();
-  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS) // TODO: play with update rate
+  if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS)
   { 
     lastTime = millis(); // Update the timer
     myGNSS.checkUblox();
@@ -336,7 +335,7 @@ void getPosition()
     DBG.print(F("Lat.: "));
     DBG.print(lat);
     DBG.print(DATA_STR_DELIMITER);
-    DBG.print(latHp);
+    DBG.println(latHp);
 
     coord_t latitude = {.coord = lat, .coordHp = latHp};
     xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
@@ -349,7 +348,7 @@ void getPosition()
     DBG.println(lonHp);
    
     coord_t longitude = {.coord = lon, .coordHp = lonHp};
-    DBG.printf("Sending to queue, longitude.coord: %d, longitude.coordHp: %d\n", longitude.coord, longitude.coordHp);
+    DBG.printf("Sending to queue:\nlongitude.coord: %d\nlongitude.coordHp: %d\n", longitude.coord, longitude.coordHp);
    
     xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
 
@@ -363,7 +362,7 @@ void getPosition()
                                 FreeRTOS
 =================================================================================
 */
-void task_get_rtk_corrections_over_wifi(void *pvParameters) 
+void task_get_rtk_data_over_wifi(void *pvParameters) 
 {
     (void)pvParameters;
 
@@ -389,7 +388,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
     // Measure stack size
     UBaseType_t uxHighWaterMark; 
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DBG.print(F("task_get_rtk_corrections_over_wifi setup, uxHighWaterMark: "));
+    // DBG.print(F("task_get_rtk_data_over_wifi setup, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
 
     // Read credentials
@@ -424,11 +423,14 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
        */
       taskStart:
 
+      // First check WiFi connection
+      if (! checkConnectionToWifiStation() ) 
+      {
+        setupWiFi(&server);
+      };
+
       if (ntripClient.connected() == false)
       {
-        // First check WiFi connection
-        while (! checkConnectionToWifiStation() ) {};
-
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());
 
@@ -582,7 +584,7 @@ void task_get_rtk_corrections_over_wifi(void *pvParameters)
             getPosition();
             // Measure stack size (last was 2304)
             // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-            // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
+            // DBG.print(F("task_get_rtk_data_over_wifi loop, uxHighWaterMark: "));
             // DBG.println(uxHighWaterMark);
           }
         }   // End (ntripClient.connected() == true)
@@ -709,7 +711,7 @@ void task_send_rtk_data_over_ble(void *pvParameters)
   // accuracyMmStr.reserve(5);
   accuracyStr.reserve(5); 
   coord_t latitude, longitude;
-  int32_t lat, lon, accuracy;
+  int32_t lat, lon, accuracy, old_accuracy = 0;
   int8_t latHp, lonHp;
 
   UBaseType_t uxHighWaterMark;
@@ -774,21 +776,21 @@ void task_send_rtk_data_over_ble(void *pvParameters)
         DBG.print(accuracy);
         DBG.println(F(" mm"));
       }
-      taskYIELD();
-      // Measure stack size (last was 10300)
+    
+      // Measure stack size (last was 9480)
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
       // DBG.print(F("task_send_rtk_data_over_ble loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
     } // while (bleConnected) ends 
 
-    while (!bleConnected) 
+    if (!bleConnected) 
     {
       DBG.println(F("Waiting for BLE connection"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
-    vTaskDelay(1000/portTICK_PERIOD_MS);
+    vTaskDelay(10/portTICK_PERIOD_MS);
   } // while (true) ends
   
   // Delete self task

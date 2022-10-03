@@ -94,8 +94,18 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define RTK_REFRESH_INTERVAL_MS       20 
 #define WIFI_TASK_INTERVAL_MS         100
 #define MIN_ACCEPTABLE_ACCURACY_MM    1000  // Device will only send if accuray is better than this
-#define NAVIGATION_FREQUENCY_HZ       20    // How often we try to pull updated from RTK2GO server 
+#define NAVIGATION_FREQUENCY_HZ       8     // How often we try to pull updated from RTK2GO server, 
+/* 
+The module supports RTK update frequencies ranging from 8 Hz (BeiDou, Galileo, GLONASS, GPS) to 
+20 Hz (GPS only), velocity and dynamic heading accuracies of 0.05 m/s and 0.3° respectively and a 
+convergence time of less than 10 s. RTK performance is characterised by a circular error probable (CEP) 
+to 10 mm + 1 ppm. The F9 engine supports a total of 184-channels (GPS L1C/A L2C, GLO L1OF L2OF, 
+GAL E1B/C E5b, BDS B1I B2I, QZSS L1C/A L1S L2C and SBAS L1C/A).
 
+Source: Broekman A, Gräbe PJ. A low-cost, mobile real-time kinematic geolocation service for engineering and 
+research applications. HardwareX. 2021 May 19;10:e00203. doi: 10.1016/j.ohx.2021.e00203. PMID: 35607668; 
+PMCID: PMC9123378. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9123378/
+*/
 #endif /*** RTK_ROVER_CONFIG_H ***/
 
 
