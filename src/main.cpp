@@ -364,109 +364,106 @@ void getPosition()
 */
 void task_get_rtk_data_over_wifi(void *pvParameters) 
 {
-    (void)pvParameters;
+  (void)pvParameters;
 
-    // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
-    long lastReceivedRTCM_ms = 0; 
-    //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
-    const int maxTimeBeforeHangup_ms = 10000; 
+  setupWiFi(&server);
 
-    while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
+  // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
+  long lastReceivedRTCM_ms = 0; 
+  // If we fail to get a complete RTCM frame after 10s, then disconnect from caster
+  const int maxTimeBeforeHangup_ms = 10000; 
+
+  while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
+  {
+    DBG.println(F("I2C for RTK not running, check cable!"));
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+  }
+
+  if (!setupGNSS()) 
+  { 
+    DBG.println("setupGNSS() failed! Freezing...");
+    while (true) {};
+  };
+
+  // Measure stack size
+  UBaseType_t uxHighWaterMark; 
+  // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+  // DBG.print(F("task_get_rtk_data_over_wifi setup, uxHighWaterMark: "));
+  // DBG.println(uxHighWaterMark);
+
+  // Read credentials
+  String casterHost = readFile(SPIFFS, PATH_RTK_CASTER_HOST);
+  String casterPort = readFile(SPIFFS, PATH_RTK_CASTER_PORT);
+  String casterUser = readFile(SPIFFS, PATH_RTK_CASTER_USER);
+  String mountPoint =  readFile(SPIFFS, PATH_RTK_MOINT_POINT);
+
+  // Check RTK credentials
+  bool credentialsExists = true;
+  credentialsExists &= !casterHost.isEmpty();
+  credentialsExists &= !casterPort.isEmpty();
+  credentialsExists &= !casterUser.isEmpty();
+  credentialsExists &= !mountPoint.isEmpty();
+
+  if (!credentialsExists) 
+  {
+    DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
+    while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
+  }
+
+  // WiFiClient ntripClient;
+  long rtcmCount = 0;
+
+  while (true) // Task loop begins
+  {
+    /** This ist most of the content beginServing() func from the
+     * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
+     * Because I did not wanted to change the code too much if you want to compare
+     * with the Example14 I used of the evil goto as a replace for the return command.
+     * (A task must not return.)
+     */
+    taskStart:
+
+    if (ntripClient.connected() == false)
     {
-      DBG.println(F("I2C for RTK not running, check cable!"));
-      vTaskDelay(1000/portTICK_PERIOD_MS);
-    }
-
-    setupWiFi(&server);
-
-    if (!setupGNSS()) 
-    { 
-      DBG.println("setupGNSS() failed! Freezing...");
-      while (true) {};
-    };
-
-    // Measure stack size
-    UBaseType_t uxHighWaterMark; 
-    // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DBG.print(F("task_get_rtk_data_over_wifi setup, uxHighWaterMark: "));
-    // DBG.println(uxHighWaterMark);
-
-    // Read credentials
-    String casterHost = readFile(SPIFFS, PATH_RTK_CASTER_HOST);
-    String casterPort = readFile(SPIFFS, PATH_RTK_CASTER_PORT);
-    String casterUser = readFile(SPIFFS, PATH_RTK_CASTER_USER);
-    String mountPoint =  readFile(SPIFFS, PATH_RTK_MOINT_POINT);
-
-    // Check RTK credentials
-    bool credentialsExists = true;
-    credentialsExists &= !casterHost.isEmpty();
-    credentialsExists &= !casterPort.isEmpty();
-    credentialsExists &= !casterUser.isEmpty();
-    credentialsExists &= !mountPoint.isEmpty();
-
-    if (!credentialsExists) 
-    {
-      DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-      while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
-    }
-
-    // WiFiClient ntripClient;
-    long rtcmCount = 0;
-
-    while (true) // Task loop begins
-    {
-      /** This ist most of the content beginServing() func from the
-       * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
-       * Because I did not wanted to change the code too much if you want to compare
-       * with the Example14 I used of the evil goto as a replace for the return command.
-       * (A task must not return.)
-       */
-      taskStart:
-
       // First check WiFi connection
-      if (! checkConnectionToWifiStation() ) 
-      {
-        setupWiFi(&server);
-      };
+      while (! checkConnectionToWifiStation() ) {};
 
-      if (ntripClient.connected() == false)
-      {
-        DBG.print(F("Opening socket to "));
-        DBG.println(casterHost.c_str());
+      DBG.print(F("Opening socket to "));
+      DBG.println(casterHost.c_str());
 
-        // Attempt connection
-        if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
+      // Attempt connection
+      if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
+      {
+        DBG.println(F("Connection to caster failed, retry in 5s"));
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+        /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+        * because return is forbidden in tasks. This is the only use of goto in this code.
+        */
+        goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+      }
+      else
+      {
+        DBG.print(F("Connected to "));
+        DBG.print(casterHost.c_str());
+        DBG.print(F(": "));
+        DBG.println((uint16_t)casterPort.toInt());
+
+        DBG.print(F("Requesting NTRIP Data from mount point "));
+        DBG.println(mountPoint.c_str());
+
+        const int SERVER_BUFFER_SIZE = 512;
+        char serverRequest[SERVER_BUFFER_SIZE];
+
+        snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
+                mountPoint.c_str());
+
+        char credentials[512];
+        if (strlen(casterUser.c_str()) == 0)
         {
-          DBG.println(F("Connection to caster failed, retry in 5s"));
-          vTaskDelay(1000/portTICK_PERIOD_MS);
-          /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-          * because return is forbidden in tasks. This is the only use of goto in this code.
-          */
-          goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+          strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
         }
         else
         {
-          DBG.print(F("Connected to "));
-          DBG.print(casterHost.c_str());
-          DBG.print(F(": "));
-          DBG.println((uint16_t)casterPort.toInt());
-
-          DBG.print(F("Requesting NTRIP Data from mount point "));
-          DBG.println(mountPoint.c_str());
-
-          const int SERVER_BUFFER_SIZE = 512;
-          char serverRequest[SERVER_BUFFER_SIZE];
-
-          snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
-                  mountPoint.c_str());
-
-          char credentials[512];
-          if (strlen(casterUser.c_str()) == 0)
-          {
-            strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
-          }
-          else
-          {
           //Pass base64 encoded user:pw
           char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
           snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
@@ -481,137 +478,140 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
           char encodedCredentials[strEncodedCredentials.length() + 1];
           strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
           snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
-  #else
+#else
           // Encode with nfriendly library
           int encodedLen = base64_enc_len(strlen(userCredentials));
           char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
           base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
-  #endif
-          }
-          strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
-          strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
+#endif
+        }
 
-          DBG.print(F("serverRequest size: "));
-          DBG.print(strlen(serverRequest));
-          DBG.print(F(" of "));
-          DBG.print(sizeof(serverRequest));
-          DBG.println(F(" bytes available"));
+        strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
+        strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
 
-          DBG.println(F("Sending server request:"));
-          DBG.println(serverRequest);
-          ntripClient.write(serverRequest, strlen(serverRequest));
+        DBG.print(F("serverRequest size: "));
+        DBG.print(strlen(serverRequest));
+        DBG.print(F(" of "));
+        DBG.print(sizeof(serverRequest));
+        DBG.println(F(" bytes available"));
 
-          // Wait for response
-          unsigned long timeout = millis();
-          while (ntripClient.available() == 0)
+        DBG.println(F("Sending server request:"));
+        DBG.println(serverRequest);
+        ntripClient.write(serverRequest, strlen(serverRequest));
+
+        // Wait for response
+        unsigned long timeout = millis();
+        while (ntripClient.available() == 0)
+        {
+          if (millis() - timeout > CONNECTION_TIMEOUT_MS)
           {
-            if (millis() - timeout > CONNECTION_TIMEOUT_MS)
-            {
-              ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
-              Serial.println(F("Caster timed out!"));
-              goto taskStart;
-            }
-            vTaskDelay(1000/portTICK_PERIOD_MS);
+            ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
+            Serial.println(F("Caster timed out!"));
+            goto taskStart;
           }
+          vTaskDelay(1000/portTICK_PERIOD_MS);
+        }
 
-          // Check reply
-          bool connectionSuccess = false;
-          char response[512];
-          int responseSpot = 0;
-          while (ntripClient.available())
+        // Check reply
+        bool connectionSuccess = false;
+        char response[512];
+        int responseSpot = 0;
+
+        while (ntripClient.available())
+        {
+          if (responseSpot == sizeof(response) - 1) break;
+
+          response[responseSpot++] = ntripClient.read();
+          if (strstr(response, "200") > 0) // Look for 'ICY 200 OK'
+            connectionSuccess = true;
+          if (strstr(response, "401") > 0) // Look for '401 Unauthorized'
           {
-            if (responseSpot == sizeof(response) - 1) break;
-
-            response[responseSpot++] = ntripClient.read();
-            if (strstr(response, "200") > 0) // Look for 'ICY 200 OK'
-              connectionSuccess = true;
-            if (strstr(response, "401") > 0) // Look for '401 Unauthorized'
-            {
-              DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
-              connectionSuccess = false;
-            }
+            DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
+            connectionSuccess = false;
           }
-          response[responseSpot] = '\0';
+        }
+        response[responseSpot] = '\0';
 
-          DBG.print(F("Caster responded with: "));
+        DBG.print(F("Caster responded with: "));
+        DBG.println(response);
+
+        if (connectionSuccess == false)
+        {
+          DBG.print(F("Failed to connect to "));
+          DBG.print(casterHost.c_str());
+          DBG.print(F(": "));
           DBG.println(response);
-
-          if (connectionSuccess == false)
-          {
-            DBG.print(F("Failed to connect to "));
-            DBG.print(casterHost.c_str());
-            DBG.print(F(": "));
-            DBG.println(response);
-
-            /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-            * because return is forbiddden in tasks. This is the only use of goto in this code.
-            */
-            goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
-          }
-          else
-          {
-            DBG.print(F("Connected to "));
-            DBG.println(casterHost.c_str());
-            lastReceivedRTCM_ms = millis(); // Reset timeout
-          }
-          } // End attempt to connect
-        } // End connected == false
-
-        if (ntripClient.connected() == true)
-        {
-          uint8_t rtcmData[512 * 4]; // Most incoming data is around 500 bytes but may be larger
-          rtcmCount = 0;
-
-          //Print any available RTCM data
-          while (ntripClient.available())
-          {
-            //DBG.write(ntripClient.read()); // Pipe to serial port is fine but beware, it's a lot of binary data
-            rtcmData[rtcmCount++] = ntripClient.read();
-            if (rtcmCount == sizeof(rtcmData)) break;
-          }
-
-          if (rtcmCount > 0)
-          {
-            //Push RTCM to GNSS module over I2C
-            myGNSS.pushRawData(rtcmData, rtcmCount, false);
-            DBG.print(F("RTCM pushed to ZED: "));
-            DBG.println(rtcmCount);
-            uint32_t currentTime = millis();
-            DBG.print(F("Last data before ms: "));
-            DBG.println(currentTime - lastReceivedRTCM_ms);
-            lastReceivedRTCM_ms = currentTime;
-            
-            getPosition();
-            // Measure stack size (last was 2304)
-            // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-            // DBG.print(F("task_get_rtk_data_over_wifi loop, uxHighWaterMark: "));
-            // DBG.println(uxHighWaterMark);
-          }
-        }   // End (ntripClient.connected() == true)
-
-        // Close socket if we don't have new data for 10s
-        if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
-        {
-          DBG.println(F("RTCM timeout. Disconnecting..."));
-          if (ntripClient.connected() == true)
-            ntripClient.stop();
 
           /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
           * because return is forbiddden in tasks. This is the only use of goto in this code.
-          */  
+          */
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
+        else
+        {
+          DBG.print(F("Connected to "));
+          DBG.println(casterHost.c_str());
+          lastReceivedRTCM_ms = millis(); // Reset timeout
+        }
+      } // End attempt to connect
+    } // End connected == false
 
-        // Measure stack size (last was 19320)
+    if (ntripClient.connected() == true)
+    {
+      uint8_t rtcmData[512 * 4]; // Most incoming data is around 500 bytes but may be larger
+      rtcmCount = 0;
+
+      //Print any available RTCM data
+      while (ntripClient.available())
+      {
+        //DBG.write(ntripClient.read()); // Pipe to serial port is fine but beware, it's a lot of binary data
+        rtcmData[rtcmCount++] = ntripClient.read();
+        if (rtcmCount == sizeof(rtcmData)) break;
+      }
+
+      if (rtcmCount > 0)
+      {
+        //Push RTCM to GNSS module over I2C
+        myGNSS.pushRawData(rtcmData, rtcmCount, false);
+        DBG.print(F("RTCM pushed to ZED: "));
+        DBG.println(rtcmCount);
+        uint32_t currentTime = millis();
+        DBG.print(F("Last data before ms: "));
+        DBG.println(currentTime - lastReceivedRTCM_ms);
+        lastReceivedRTCM_ms = currentTime;
+        
+        getPosition();
+        // Measure stack size (last was 2304)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
         // DBG.println(uxHighWaterMark);
-        vTaskDelay(WIFI_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
-
       }
-      // Delete self task
-      vTaskDelete(NULL);
+    }   // End (ntripClient.connected() == true)
+
+    // Close socket if we don't have new data for 10s
+    if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
+    {
+      DBG.println(F("RTCM timeout. Disconnecting..."));
+      if (ntripClient.connected() == true)
+        ntripClient.stop();
+
+      /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+      * because return is forbiddden in tasks. This is the only use of goto in this code.
+      */  
+      goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+    }
+
+    // Measure stack size (last was 19320)
+    // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+    // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
+    // DBG.println(uxHighWaterMark);
+    vTaskDelay(TASK_RTK_WIFT_INTERVAL_MS/portTICK_PERIOD_MS);
+
   }
+  // Delete self task
+  vTaskDelete(NULL);
+
+} /*** end task_get_rtk_data_over_wifi ***/
 
 /*
 =================================================================================
@@ -711,7 +711,7 @@ void task_send_rtk_data_over_ble(void *pvParameters)
   // accuracyMmStr.reserve(5);
   accuracyStr.reserve(5); 
   coord_t latitude, longitude;
-  int32_t lat, lon, accuracy, old_accuracy = 0;
+  int32_t lat, lon, accuracy, old_accuracy = -1;
   int8_t latHp, lonHp;
 
   UBaseType_t uxHighWaterMark;
@@ -748,8 +748,7 @@ void task_send_rtk_data_over_ble(void *pvParameters)
         // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
         if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) 
         {
-          accuracyStr = String(accuracy);
-          
+          // Send coords
           latLongStr = String(lat);
           latLongStr += DATA_STR_DELIMITER;
           latLongStr += String(latHp);
@@ -757,12 +756,18 @@ void task_send_rtk_data_over_ble(void *pvParameters)
           latLongStr += String(lon);
           latLongStr += DATA_STR_DELIMITER;
           latLongStr += String(lonHp);
-          // Send coords
+          
           pRealtimeKinematicsCharacteristic->setValue(latLongStr.c_str());
           pRealtimeKinematicsCharacteristic->notify();
-          // Send accuracy
-          pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
-          pRTKAccuracyCharacteristic->notify();
+
+          // Send accuracy if changed
+          if (accuracy != old_accuracy)
+          {
+            accuracyStr = String(accuracy);
+            pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
+            pRTKAccuracyCharacteristic->notify();
+            old_accuracy = accuracy;
+          }
 
           // DBG.print(F("BLE sent lat./long.: "));
           // DBG.println(latLongStr);
@@ -790,7 +795,7 @@ void task_send_rtk_data_over_ble(void *pvParameters)
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
-    vTaskDelay(10/portTICK_PERIOD_MS);
+    vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
   } // while (true) ends
   
   // Delete self task
@@ -855,7 +860,8 @@ void task_send_bno080_data_over_ble(void *pvParameters)
         pHeadtrackerCharacteristic->setValue(dataStr.c_str());
         pHeadtrackerCharacteristic->notify();
         // DBG.println(linAccelZF);      
-        } else 
+        } 
+        else 
         {
           DBG.println(F("Waiting for BNO080 dataAvailable"));
           vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -864,11 +870,12 @@ void task_send_bno080_data_over_ble(void *pvParameters)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DBG.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
         // DBG.println(uxHighWaterMark);
-        vTaskDelay(BLE_TASK_INTERVAL_MS/portTICK_PERIOD_MS);
+        vTaskDelay(TASK_BNO080_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
     }
     // Delete self task
     vTaskDelete(NULL);
-}
+
+} /*** end task_send_bno080_data_over_ble ***/
 
 /*
 =================================================================================
