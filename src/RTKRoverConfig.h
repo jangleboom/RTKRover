@@ -13,7 +13,7 @@
 */
 
 //set to true for debug output, false for no debug output
-#define DEBUGGING false 
+#define DEBUGGING true 
 #define DBG \
   if (DEBUGGING) Serial
 
