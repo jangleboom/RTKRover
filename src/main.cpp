@@ -198,15 +198,16 @@ void getPosition(void);
                                 FreeRTOS
 =================================================================================
 */
-
 typedef struct Coord
 {
-  int32_t coord;
-  int8_t  coordHp;
+  int32_t lat;
+  int8_t  latHp;
+  int32_t lon;
+  int8_t  lonHp;
 } coord_t;
 
 const uint8_t QUEUE_SIZE = 2;
-xQueueHandle xQueueLatitude, xQueueLongitude, xQueueAccuracy;
+xQueueHandle xQueueAccuracy, xQueueCoord;
 
 /**
  * @brief Task to get the correction data from the caster server
@@ -326,34 +327,32 @@ bool setupGNSS()
 void getPosition() 
 {
   static long lastRun = millis();
+  static int32_t old_accuracy = -1;
+
   if (millis() - lastRun > RTK_REFRESH_INTERVAL_MS)
   { 
-    lastTime = millis(); // Update the timer
+    // Update the timer
+    lastTime = millis(); 
+
+    coord_t coord;
+
     myGNSS.checkUblox();
+
     int32_t lat = myGNSS.getHighResLatitude();
     int8_t latHp = myGNSS.getHighResLatitudeHp();
-    DBG.print(F("Lat.: "));
-    DBG.print(lat);
-    DBG.print(DATA_STR_DELIMITER);
-    DBG.println(latHp);
-
-    coord_t latitude = {.coord = lat, .coordHp = latHp};
-    xQueueSend( xQueueLatitude, &latitude, portMAX_DELAY );
-  
     int32_t lon = myGNSS.getHighResLongitude();
     int8_t lonHp = myGNSS.getHighResLongitudeHp();
-    DBG.print(F(" Lon.: "));
-    DBG.print(lon);
-    DBG.print(DATA_STR_DELIMITER);
-    DBG.println(lonHp);
-   
-    coord_t longitude = {.coord = lon, .coordHp = lonHp};
-    DBG.printf("Sending to queue:\nlongitude.coord: %d\nlongitude.coordHp: %d\n", longitude.coord, longitude.coordHp);
-   
-    xQueueSend( xQueueLongitude, &longitude, portMAX_DELAY );
-
     int32_t accuracy = myGNSS.getPositionAccuracy();
-    xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
+
+    coord = {.lat = lat, .latHp = latHp, .lon = lon, .lonHp = lonHp};
+    xQueueSend(xQueueCoord, &coord, portMAX_DELAY); 
+
+    // Send accuracy if changed
+    if (accuracy != old_accuracy)
+    {
+      xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
+      old_accuracy = accuracy;
+    }
   }
 }
 
@@ -630,8 +629,7 @@ void setupBLE(void)
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
-                                         BLECharacteristic::PROPERTY_NOTIFY 
-                                         // We only use notify characteristic
+                                         BLECharacteristic::PROPERTY_NOTIFY  // We only use notify characteristic (fastest -> no response)
                                        );
 
     pRealtimeKinematicsCharacteristic = pService->createCharacteristic(
@@ -639,8 +637,7 @@ void setupBLE(void)
                                         //  BLECharacteristic::PROPERTY_READ   |
                                         //  BLECharacteristic::PROPERTY_WRITE  |
                                         //  BLECharacteristic::PROPERTY_INDICATE |
-                                         BLECharacteristic::PROPERTY_NOTIFY 
-                                         // We only use notify characteristic
+                                         BLECharacteristic::PROPERTY_NOTIFY  // We only use notify characteristic (fastest -> no response)
                                        );
                                     
     pRTKAccuracyCharacteristic = pService->createCharacteristic(
@@ -648,7 +645,7 @@ void setupBLE(void)
                                 //  BLECharacteristic::PROPERTY_READ   |
                                 //  BLECharacteristic::PROPERTY_WRITE  |
                                 //  BLECharacteristic::PROPERTY_INDICATE |
-                                BLECharacteristic::PROPERTY_NOTIFY // We only use notify characteristic
+                                BLECharacteristic::PROPERTY_NOTIFY // We only use notify characteristic (fastest -> no response)
                                 );
 
     pHeadtrackerCharacteristic->addDescriptor(new BLE2902());
@@ -694,8 +691,7 @@ void setupBNO080()
 
 void xQueueSetup() 
 {
-  xQueueLatitude  = xQueueCreate( QUEUE_SIZE, sizeof( coord_t ) );
-  xQueueLongitude = xQueueCreate( QUEUE_SIZE, sizeof( coord_t ) );
+  xQueueCoord  = xQueueCreate( QUEUE_SIZE, sizeof( coord_t ) );
   xQueueAccuracy  = xQueueCreate( QUEUE_SIZE, sizeof( long ) );
 }
 
@@ -703,15 +699,15 @@ void task_send_rtk_data_over_ble(void *pvParameters)
 {
   (void)pvParameters;
   
-  String latLongStr((char *)0);
+  String latLonStr((char *)0);
   // String accuracyMmStr((char *)0);
   String accuracyStr((char *)0);
   // Latitude: 9, delimiter: 1, latitudeHp: 2, longitude: 9, delimiter: 1, longitudeHp: 2,
-  latLongStr.reserve(24);
-  // accuracyMmStr.reserve(5);
+  latLonStr.reserve(27);
   accuracyStr.reserve(5); 
-  coord_t latitude, longitude;
-  int32_t lat, lon, accuracy, old_accuracy = -1;
+ 
+  coord_t coord;
+  int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
   UBaseType_t uxHighWaterMark;
@@ -723,71 +719,52 @@ void task_send_rtk_data_over_ble(void *pvParameters)
   {
     while (bleConnected) 
     {
-      if (xQueueReceive( xQueueLatitude, &latitude, ( TickType_t ) 10 ) == pdPASS) 
+      if (xQueueReceive( xQueueCoord, &coord, ( TickType_t ) 10 ) == pdPASS) 
       {
-        DBG.print("Received latitude.coord = ");
-        DBG.print(latitude.coord);
-        DBG.print(", latitude.coordHp = ");
-        DBG.println(latitude.coordHp);
-        lat = latitude.coord;
-        latHp = latitude.coordHp;
-      }
+        DBG.print("Received coord.lat = ");
+        DBG.print(coord.lat);
+        DBG.print(", coord.latHp = ");
+        DBG.print(coord.latHp);
+        DBG.print(" coord.lon = ");
+        DBG.print(coord.lon);
+        DBG.print(", coord.lonHp = ");
+        DBG.println(coord.lonHp);
+        lat = coord.lat;
+        latHp = coord.latHp;
+        lon = coord.lon;
+        lonHp = coord.lonHp;
 
-      if (xQueueReceive( xQueueLongitude, &longitude, ( TickType_t ) 10 ) == pdPASS) 
-      {
-        DBG.print("Received longitude.coord = ");
-        DBG.print(longitude.coord);
-        DBG.print(", longitude.coordHp = ");
-        DBG.println(longitude.coordHp);
-        lon = longitude.coord;
-        lonHp = longitude.coordHp;
+        // Send coords
+        latLonStr = String(lat);
+        latLonStr += DATA_STR_DELIMITER;
+        latLonStr += String(latHp);
+        latLonStr += DATA_STR_DELIMITER;
+        latLonStr += String(lon);
+        latLonStr += DATA_STR_DELIMITER;
+        latLonStr += String(lonHp);
+        // DBG.print(F("latLonStr.length(): "));DBG.println(latLonStr.length());
+        pRealtimeKinematicsCharacteristic->setValue(latLonStr.c_str());
+        pRealtimeKinematicsCharacteristic->notify();
       }
 
       if (xQueueReceive( xQueueAccuracy, &accuracy, ( TickType_t ) 10 ) == pdPASS) 
       {
-        // Send position if accuracy is better than MIN_ACCEPTABLE_ACCURACY_MM
-        if (accuracy < MIN_ACCEPTABLE_ACCURACY_MM) 
-        {
-          // Send coords
-          latLongStr = String(lat);
-          latLongStr += DATA_STR_DELIMITER;
-          latLongStr += String(latHp);
-          latLongStr += DATA_STR_DELIMITER;
-          latLongStr += String(lon);
-          latLongStr += DATA_STR_DELIMITER;
-          latLongStr += String(lonHp);
-          
-          pRealtimeKinematicsCharacteristic->setValue(latLongStr.c_str());
-          pRealtimeKinematicsCharacteristic->notify();
-
-          // Send accuracy if changed
-          if (accuracy != old_accuracy)
-          {
-            accuracyStr = String(accuracy);
-            pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
-            pRTKAccuracyCharacteristic->notify();
-            old_accuracy = accuracy;
-          }
-
-          // DBG.print(F("BLE sent lat./long.: "));
-          // DBG.println(latLongStr);
-        } 
-        else 
-        {
-          DBG.print(F("No position data sent! (Accuracy bad)"));
-        }
+        accuracyStr = String(accuracy);
+        // DBG.print(F("accuracyStr.length(): "));DBG.println(accuracyStr.length());
+        pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
+        pRTKAccuracyCharacteristic->notify();
 
         DBG.print(F("Received accuracy = "));
         DBG.print(accuracy);
         DBG.println(F(" mm"));
       }
     
-      // Measure stack size (last was 9480)
+      /*  Measure stack size (last was 9356) */
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
       // DBG.print(F("task_send_rtk_data_over_ble loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
-    } // while (bleConnected) ends 
+    } /*** while (bleConnected) ends ***/
 
     if (!bleConnected) 
     {
