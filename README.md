@@ -1,7 +1,8 @@
 <img align="right" src="./screenshots/rtkrover.jpeg" width="240"/> 
-### RTKRover
+
+# RTKRover
 ## Headtracker + Real Time Kinematics (RTK Client)
-Hardware used:   
+### Hardware used:   
 * Adafruit Feather ESP32 Huzzah 
 * SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
 * SparkFun BNO080 Breakout
@@ -11,12 +12,17 @@ Hardware used:
 * Resistor 10 k
 * Switch
 
+### Dependencies
+* [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+* [RTKRoverManager](https://github.com/audio-communication-group/RTKRoverManager)
+
 ![plot](./fritzing/RTKRover-bb.png)
 
-Infrastructure:
+### Infrastructure:
 * WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
 
+### Caster connection
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
 ````
