@@ -44,7 +44,7 @@ const char kCasterUserPW[] = "";
 // Emlid Caster MountPoint
 // Email: YOUR_ACCOUNT_EMAIL.COM
 const char kCasterHost[] = "caster.emlid.com";
-const uint16_t casterPort = 2101;
+const uint16_t kCasterPort = 2101;
 const char kCasterUser[] = "YOUR_EMLID_USER_NAME";   //User name and pw must be obtained through their web portal
 const char kMountPoint[] = "YOUR_EMLID_MOUNT_POINT"; //The mount point you want to push data to
 const char kMountPointPW[] = "YOUR_EMLID_USER_PASSWORD";
