@@ -420,13 +420,15 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
      * with the Example14 I used of the evil goto as a replace for the return command.
      * (A task must not return.)
      */
+
     taskStart:
+
+    // First check WiFi connection
+    while (! checkConnectionToWifiStation() ) 
+      vTaskDelay(1000/portTICK_PERIOD_MS);
 
     if (ntripClient.connected() == false)
     {
-      // First check WiFi connection
-      while (! checkConnectionToWifiStation() ) {};
-
       DBG.print(F("Opening socket to "));
       DBG.println(casterHost.c_str());
 
@@ -434,7 +436,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
       if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
       {
         DBG.println(F("Connection to caster failed, retry in 5s"));
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(5000/portTICK_PERIOD_MS);
         /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
         * because return is forbidden in tasks. This is the only use of goto in this code.
         */
@@ -579,7 +581,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
         DBG.println(currentTime - lastReceivedRTCM_ms);
         lastReceivedRTCM_ms = currentTime;
         
-        getPosition();
+        // getPosition();
         // Measure stack size (last was 2304)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
@@ -605,6 +607,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
     // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
     vTaskDelay(TASK_RTK_WIFT_INTERVAL_MS/portTICK_PERIOD_MS);
+    getPosition();
 
   }
   // Delete self task
