@@ -843,14 +843,14 @@ void task_send_bno080_data_over_ble(void *pvParameters)
         } 
         else 
         {
-          DBG.println(F("Waiting for BNO080 dataAvailable"));
+          DBG.println(F("Waiting for BNO080 data available"));
           vTaskDelay(1000/portTICK_PERIOD_MS);
         }
         // Measure stack size
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DBG.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
         // DBG.println(uxHighWaterMark);
-        vTaskDelay(TASK_BNO080_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+        taskYIELD();
     }
     // Delete self task
     vTaskDelete(NULL);
