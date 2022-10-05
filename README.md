@@ -1,7 +1,8 @@
 <img align="right" src="./screenshots/rtkrover.jpeg" width="240"/> 
 
-# RTKRover
-## Headtracker + Real Time Kinematics (RTK Client)
+# Head Tracker + Real Time Kinematics (RTK Client)
+## RTKRover
+
 ### Hardware used:   
 * Adafruit Feather ESP32 Huzzah 
 * SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
