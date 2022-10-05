@@ -13,7 +13,7 @@
 */
 
 // Set to true for debug output, false for no debug output
-#define DEBUGGING false 
+#define DEBUGGING true 
 #define DBG \
   if (DEBUGGING) Serial
 
@@ -92,7 +92,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define RTK_OVER_BLE_PRIORITY         2     // Real Time Kinematics data to iOS app, (should not break head tracking)
 #define TASK_BNO080_BLE_INTERVAL_MS   10
 #define TASK_RTK_BLE_INTERVAL_MS      20
-#define RTK_REFRESH_INTERVAL_MS       20 
+#define RTK_REFRESH_INTERVAL_MS       50   
 #define TASK_RTK_WIFT_INTERVAL_MS     20
 #define MIN_ACCEPTABLE_ACCURACY_MM    1000  // Device will only send if accuray is better than this
 #define NAVIGATION_FREQUENCY_HZ       8     // How often we try to pull updated from RTK2GO server, 
