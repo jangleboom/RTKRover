@@ -423,9 +423,12 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
 
     taskStart:
 
-    // First check WiFi connection
-    while (! checkConnectionToWifiStation() ) 
-      vTaskDelay(1000/portTICK_PERIOD_MS);
+    // First check WiFi connection, and reconnect if necassary
+    checkConnectionToWifiStation();
+
+    // Or do a wait loop
+    // while (! checkConnectionToWifiStation() ) 
+      // vTaskDelay(1000/portTICK_PERIOD_MS);
 
     if (ntripClient.connected() == false)
     {
