@@ -39,7 +39,7 @@
 #define RTK_I2C_ADDR                0x42
 #define RTK_SDA_PIN                 33
 #define RTK_SCL_PIN                 32
-
+#define CONNECTION_TIMEOUT_MS       10000
 /*
 =================================================================================
                                 BLE settings

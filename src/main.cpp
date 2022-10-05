@@ -464,8 +464,8 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
         else
         {
           //Pass base64 encoded user:pw
-          char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
-          snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
+          char userCredentials[(casterUser.length()+1) + sizeof(kCasterUserPW) + 1]; //The ':' takes up a spot
+          snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), kCasterUserPW);
 
           DBG.print(F("Sending credentials: "));
           DBG.println(userCredentials);
