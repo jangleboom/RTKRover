@@ -370,19 +370,13 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
   // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
   long lastReceivedRTCM_ms = 0; 
   // If we fail to get a complete RTCM frame after 10s, then disconnect from caster
-  const int maxTimeBeforeHangup_ms = 10000; 
+  const int kMaxTimeBeforeHangup_ms = 10000; 
 
   while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
   {
     DBG.println(F("I2C for RTK not running, check cable!"));
     vTaskDelay(1000/portTICK_PERIOD_MS);
   }
-
-  if (!setupGNSS()) 
-  { 
-    DBG.println("setupGNSS() failed! Freezing...");
-    while (true) {};
-  };
 
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
@@ -408,6 +402,12 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
     DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
     while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
   }
+
+  if (!setupGNSS()) 
+  { 
+    DBG.println("setupGNSS() failed! Freezing...");
+    while (true) {};
+  };
 
   // WiFiClient ntripClient;
   long rtcmCount = 0;
@@ -593,7 +593,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
     }   // End (ntripClient.connected() == true)
 
     // Close socket if we don't have new data for 10s
-    if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
+    if (millis() - lastReceivedRTCM_ms > kMaxTimeBeforeHangup_ms)
     {
       DBG.println(F("RTCM timeout. Disconnecting..."));
       if (ntripClient.connected() == true)
@@ -772,7 +772,7 @@ void task_send_rtk_data_over_ble(void *pvParameters)
 
     } /*** while (bleConnected) ends ***/
 
-    if (!bleConnected) 
+    while (!bleConnected) 
     {
       DBG.println(F("Waiting for BLE connection"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
