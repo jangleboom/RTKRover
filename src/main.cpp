@@ -42,7 +42,7 @@
 #include <BLE2902.h>
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 #include <SparkFun_BNO080_Arduino_Library.h>
-#include <imumaths.h>
+#include <utility/imumaths.h>
 #include <sdkconfig.h>
 #include <RTKRoverConfig.h>
 #include <CasterSecrets.h>
