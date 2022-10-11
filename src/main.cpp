@@ -264,6 +264,8 @@ void setup()
   wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
+
+  setupWiFi(&server);;
   
   // FreeRTOS
   xQueueSetup();
@@ -277,7 +279,7 @@ void setup()
   int stack_size_task_get_rtk_data_over_wifi = 1024 * 7;      // Last measurement: 
   int stack_size_task_send_bno080_data_over_ble = 1024 * 11;  // Last measurement:
   int stack_size_task_send_rtk_data_over_ble = 1024 * 10;     // Last measurement: 9480
-  xTaskCreatePinnedToCore( &task_get_rtk_data_over_wifi, "task_get_rtk_data_over_wifi", stack_size_task_get_rtk_data_over_wifi, NULL, RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  //xTaskCreatePinnedToCore( &task_get_rtk_data_over_wifi, "task_get_rtk_data_over_wifi", stack_size_task_get_rtk_data_over_wifi, NULL, RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", stack_size_task_send_bno080_data_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_data_over_ble, "task_send_rtk_data_over_ble", stack_size_task_send_rtk_data_over_ble, NULL, RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
@@ -364,8 +366,6 @@ void getPosition()
 void task_get_rtk_data_over_wifi(void *pvParameters) 
 {
   (void)pvParameters;
-
-  setupWiFi(&server);
 
   // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
   long lastReceivedRTCM_ms = 0; 
