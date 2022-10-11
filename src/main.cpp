@@ -316,6 +316,7 @@ bool setupGNSS()
     response &= myGNSS.setI2COutput(COM_TYPE_UBX); 
     //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
     response &= myGNSS.setPortInput(COM_PORT_I2C, COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); 
+    response &= myGNSS.setHighPrecisionMode(true);
     // Set output in Hz.
     response &= myGNSS.setNavigationFrequency(NAVIGATION_FREQUENCY_HZ); 
 
