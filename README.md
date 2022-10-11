@@ -13,7 +13,7 @@
 * Resistor 10 k
 * Switch
 
-### Dependencies
+### Dependencies:
 * [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
 * [RTKRoverManager](https://github.com/audio-communication-group/RTKRoverManager)
 
