@@ -17,6 +17,7 @@
 * [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
 * [RTKRoverManager](https://github.com/audio-communication-group/RTKRoverManager)
 
+### Circuit diagram
 ![plot](./fritzing/RTKRover-bb.png)
 
 ### Infrastructure:
