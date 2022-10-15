@@ -279,9 +279,9 @@ void setup()
   int stack_size_task_get_rtk_data_over_wifi = 1024 * 7;      // Last measurement: 
   int stack_size_task_send_bno080_data_over_ble = 1024 * 11;  // Last measurement:
   int stack_size_task_send_rtk_data_over_ble = 1024 * 10;     // Last measurement: 9480
-  xTaskCreatePinnedToCore( &task_get_rtk_data_over_wifi, "task_get_rtk_data_over_wifi", stack_size_task_get_rtk_data_over_wifi, NULL, RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", stack_size_task_send_bno080_data_over_ble, NULL, BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-  xTaskCreatePinnedToCore( &task_send_rtk_data_over_ble, "task_send_rtk_data_over_ble", stack_size_task_send_rtk_data_over_ble, NULL, RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_get_rtk_data_over_wifi, "task_get_rtk_data_over_wifi", stack_size_task_get_rtk_data_over_wifi, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_send_bno080_data_over_ble, "task_send_bno080_data_over_ble", stack_size_task_send_bno080_data_over_ble, NULL, TASK_BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_send_rtk_data_over_ble, "task_send_rtk_data_over_ble", stack_size_task_send_rtk_data_over_ble, NULL, TASK_RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
@@ -338,7 +338,7 @@ void getPosition()
 
     coord_t coord;
 
-    myGNSS.checkUblox();
+    // myGNSS.checkUblox();
 
     int32_t lat = myGNSS.getHighResLatitude();
     int8_t latHp = myGNSS.getHighResLatitudeHp();
@@ -604,8 +604,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
     // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
-    vTaskDelay(TASK_RTK_WIFT_INTERVAL_MS/portTICK_PERIOD_MS);
-    // taskYIELD();
+    vTaskDelay(TASK_RTK_WIFI_INTERVAL_MS/portTICK_PERIOD_MS);
 
   }
   // Delete self task
@@ -773,7 +772,8 @@ void task_send_rtk_data_over_ble(void *pvParameters)
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
-    vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+    // vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+    taskYIELD();
   } // while (true) ends
   
   // Delete self task
@@ -848,7 +848,6 @@ void task_send_bno080_data_over_ble(void *pvParameters)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DBG.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
         // DBG.println(uxHighWaterMark);
-        // vTaskDelay(TASK_BNO080_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
         taskYIELD();
     }
     // Delete self task

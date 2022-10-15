@@ -87,15 +87,14 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define RUNNING_CORE_1                1     // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define RTK_OVER_WIFI_PRIORITY        2     // GNSS should have a lower priority than BNO080 data transmission
-#define BNO080_OVER_BLE_PRIORITY      1     // Headtracking: highest priority for immersive audio
-#define RTK_OVER_BLE_PRIORITY         2     // Real Time Kinematics data to iOS app, (should not break head tracking)
-#define TASK_BNO080_BLE_INTERVAL_MS   10
-#define TASK_RTK_BLE_INTERVAL_MS      20
+#define TASK_RTK_OVER_WIFI_PRIORITY        2     // GNSS should have a lower priority than BNO080 data transmission
+#define TASK_BNO080_OVER_BLE_PRIORITY      1     // Headtracking: highest priority for immersive audio
+#define TASK_RTK_OVER_BLE_PRIORITY         1     // Real Time Kinematics data to iOS app, (should not break head tracking)
+// #define TASK_RTK_BLE_INTERVAL_MS      20
 #define RTK_REFRESH_INTERVAL_MS       20 
-#define TASK_RTK_WIFT_INTERVAL_MS     20
+#define TASK_RTK_WIFI_INTERVAL_MS     1000
 #define MIN_ACCEPTABLE_ACCURACY_MM    1000  // Device will only send if accuray is better than this
-#define NAVIGATION_FREQUENCY_HZ       8     // How often we try to pull updated from RTK2GO server, 
+#define NAVIGATION_FREQUENCY_HZ       20    // Set output to 20 times a second 
 /* 
 The module supports RTK update frequencies ranging from 8 Hz (BeiDou, Galileo, GLONASS, GPS) to 
 20 Hz (GPS only), velocity and dynamic heading accuracies of 0.05 m/s and 0.3° respectively and a 
