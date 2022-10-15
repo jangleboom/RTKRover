@@ -319,7 +319,6 @@ bool setupGNSS()
     response &= myGNSS.setHighPrecisionMode(true);
     // Set output in Hz.
     response &= myGNSS.setNavigationFrequency(NAVIGATION_FREQUENCY_HZ); 
-
     byte rate = myGNSS.getNavigationFrequency(); //Get the update rate of this module
     DBG.print("Current update rate: ");
     DBG.println(rate);
@@ -426,7 +425,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
     if (ntripClient.connected() == false)
     {
       // First check WiFi connection
-      while (! checkConnectionToWifiStation() ) {};
+      while (checkConnectionToWifiStation() == false) {};
 
       DBG.print(F("Opening socket to "));
       DBG.println(casterHost.c_str());
@@ -606,6 +605,7 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
     // DBG.print(F("task_get_rtk_corrections_over_wifi loop, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
     vTaskDelay(TASK_RTK_WIFT_INTERVAL_MS/portTICK_PERIOD_MS);
+    // taskYIELD();
 
   }
   // Delete self task
@@ -848,7 +848,8 @@ void task_send_bno080_data_over_ble(void *pvParameters)
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
         // DBG.print(F("task_send_bno080_data_over_ble loop, uxHighWaterMark: "));
         // DBG.println(uxHighWaterMark);
-        vTaskDelay(TASK_BNO080_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+        // vTaskDelay(TASK_BNO080_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+        taskYIELD();
     }
     // Delete self task
     vTaskDelete(NULL);
