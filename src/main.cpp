@@ -338,7 +338,7 @@ void getPosition()
 
     coord_t coord;
 
-    // myGNSS.checkUblox();
+    myGNSS.checkUblox();
 
     int32_t lat = myGNSS.getHighResLatitude();
     int8_t latHp = myGNSS.getHighResLatitudeHp();
