@@ -13,7 +13,7 @@
 */
 
 // Set to true for debug output, false for no debug output
-#define DEBUGGING false 
+#define DEBUGGING true 
 #define DBG \
   if (DEBUGGING) Serial
 
@@ -83,18 +83,18 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
                                 FreeRTOS settings
 =================================================================================
 */
-#define RUNNING_CORE_0                0     // Low level WiFi code runs on core 0
-#define RUNNING_CORE_1                1     // Use core 1 for all other tasks
+#define RUNNING_CORE_0                      0     // Low level WiFi code runs on core 0
+#define RUNNING_CORE_1                      1     // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define TASK_RTK_OVER_WIFI_PRIORITY        2     // GNSS should have a lower priority than BNO080 data transmission
-#define TASK_BNO080_OVER_BLE_PRIORITY      1     // Headtracking: highest priority for immersive audio
-#define TASK_RTK_OVER_BLE_PRIORITY         1     // Real Time Kinematics data to iOS app, (should not break head tracking)
-// #define TASK_RTK_BLE_INTERVAL_MS      20
-#define RTK_REFRESH_INTERVAL_MS       20 
-#define TASK_RTK_WIFI_INTERVAL_MS     1000
-#define MIN_ACCEPTABLE_ACCURACY_MM    1000  // Device will only send if accuray is better than this
-#define NAVIGATION_FREQUENCY_HZ       20    // Set output to 20 times a second 
+#define TASK_RTK_OVER_WIFI_PRIORITY         1     // GNSS should have a lower priority than BNO080 data transmission
+#define TASK_BNO080_OVER_BLE_PRIORITY       1     // Headtracking: highest priority for immersive audio
+#define TASK_RTK_OVER_BLE_PRIORITY          1     // Real Time Kinematics data to iOS app, (should not break head tracking)
+#define TASK_RTK_BLE_INTERVAL_MS            20
+#define RTK_REFRESH_INTERVAL_MS             20    // Get data from ublox in getPosition()
+#define TASK_RTK_WIFI_INTERVAL_MS           200   // Get fresh correction data from caster
+#define MIN_ACCEPTABLE_ACCURACY_MM          1000  // Device will only send if accuray is better than this
+#define NAVIGATION_FREQUENCY_HZ             20     // Set solution output to x times a second 
 /* 
 The module supports RTK update frequencies ranging from 8 Hz (BeiDou, Galileo, GLONASS, GPS) to 
 20 Hz (GPS only), velocity and dynamic heading accuracies of 0.05 m/s and 0.3° respectively and a 
