@@ -13,7 +13,7 @@ Hardware used:
 * Resistor 10 k
 * Switch
 
-Infrastructure
+Infrastructure:
 * WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
 
