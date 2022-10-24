@@ -24,10 +24,7 @@ Hardware used:
 * WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
 
-### Dependencies
-
 ### Configuration
-
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
 ````
