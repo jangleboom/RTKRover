@@ -1,4 +1,4 @@
-<img align="right" src="./Screenshots/rtkrover.jpeg" width="240"/> 
+<img align="right" src="./screenshots/rtkrover.jpeg" width="240"/> 
 ### RTKRover
 ## Headtracker + Real Time Kinematics (RTK Client)
 Hardware used:   
