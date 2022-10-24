@@ -13,11 +13,16 @@ Hardware used:
 * Resistor 10 k
 * Switch
 
+### Hookup
+
 ![plot](./fritzing/RTKRover-bb.jpg)
 
-Infrastructure:
+### Infrastructure needed
+
 * WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
+
+### Configuration
 
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
 
