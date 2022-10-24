@@ -11,7 +11,7 @@ Hardware used:
 * Resistor 10 k
 * Switch
 
-![plot](./fritzing/RTKRover-bb.png)
+![plot](./fritzing/RTKRover-bb.jpeg)
 
 Infrastructure:
 * WiFi (e. g. a personal hotspot)
