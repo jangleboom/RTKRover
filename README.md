@@ -1,6 +1,6 @@
 <img align="right" src="./screenshots/rtkrover.jpeg" width="240"/> 
 
-### RTKRover
+# RTKRover
 ## Headtracker + Real Time Kinematics (RTK Client)
 
 Hardware used:   
@@ -17,7 +17,7 @@ Hardware used:
 
 ![plot](./fritzing/RTKRover-bb.jpg)
 
-### Infrastructure needed
+### Infrastructure
 
 * WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
