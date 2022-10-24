@@ -13,14 +13,18 @@ Hardware used:
 * Resistor 10 k
 * Switch
 
-### Hookup
+### Dependencies
+* [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer)
+* [RTKRoverManager](https://github.com/jangleboom/RTKRoverManager)
 
+### Circuit diagram
 ![plot](./fritzing/RTKRover-bb.jpg)
 
 ### Infrastructure
-
 * WiFi (e. g. a personal hotspot)
 * free line of sight between antenna (horizontal placed) an sky
+
+### Dependencies
 
 ### Configuration
 
