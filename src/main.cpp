@@ -59,9 +59,9 @@ String deviceName = getDeviceName(DEVICE_TYPE);
 =================================================================================
 */
 #include "Button2.h"
+
 // Button to press to wipe out stored WiFi credentials
-const int BUTTON_PIN = 15;
-Button2 wipeButton = Button2(BUTTON_PIN, INPUT, false, false);
+Button2 wipeButton = Button2(WIPE_BUTTON_PIN, INPUT, false, false);
 
 void buttonHandler(Button2 &btn);
 

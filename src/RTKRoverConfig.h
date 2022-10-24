@@ -106,6 +106,17 @@ Source: Broekman A, Gräbe PJ. A low-cost, mobile real-time kinematic geolocatio
 research applications. HardwareX. 2021 May 19;10:e00203. doi: 10.1016/j.ohx.2021.e00203. PMID: 35607668; 
 PMCID: PMC9123378. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9123378/
 */
+
+/*
+=================================================================================
+                          Button(s) settings
+=================================================================================
+*/
+// Button to press to wipe out stored WiFi and RTK credentials
+#define WIPE_BUTTON_PIN                    15
+
+// Reset button is just a hardware connection (EN -> GND)
+
 #endif /*** RTK_ROVER_CONFIG_H ***/
 
 
