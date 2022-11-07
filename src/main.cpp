@@ -244,7 +244,6 @@ WiFiClient ntripClient;
 
 void setup() 
 {
-  // Wire.begin();
   #ifdef DEBUGGING
   Serial.begin(BAUD);
   while (!Serial) {};
@@ -261,7 +260,7 @@ void setup()
   DBG.print(getBatteryVolts());  
   DBG.println(" V");
 
-  wipeButton.setPressedHandler(buttonHandler); // INPUT_PULLUP is set too here  
+  wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
