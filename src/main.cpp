@@ -249,6 +249,12 @@ void setup()
   while (!Serial) {};
   #endif
 
+  String chipID = getDeviceName("rtkrover");
+  DBG.println("CHIP ID:");
+  DBG.println("-------------------------");
+  DBG.println(chipID);
+  DBG.println("-------------------------");
+  
   // Init file system
   if (!setupSPIFFS(FORMAT_SPIFFS_IF_FAILED)) while (true) {}; // Freezing
 
@@ -396,11 +402,16 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
   String mountPoint =  readFile(SPIFFS, PATH_RTK_MOINT_POINT);
 
   // Check RTK credentials
-  bool credentialsExists = true;
-  credentialsExists &= !casterHost.isEmpty();
-  credentialsExists &= !casterPort.isEmpty();
-  credentialsExists &= !casterUser.isEmpty();
-  credentialsExists &= !mountPoint.isEmpty();
+ bool credentialsExists = true;
+  // credentialsExists &= !casterHost.isEmpty();
+  // credentialsExists &= !casterPort.isEmpty();
+  // credentialsExists &= !casterUser.isEmpty();
+  // credentialsExists &= !mountPoint.isEmpty();
+
+  casterHost = "rtk2go.com";
+  casterPort = "2101";
+  casterUser = "fhnwbasel@gmail.com";
+  mountPoint =  "soundwalk";
 
   if (!credentialsExists) 
   {
