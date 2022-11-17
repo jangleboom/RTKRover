@@ -249,9 +249,17 @@ void setup()
   while (!Serial) {};
   #endif
 
-  // Init file system
-  if (!setupSPIFFS(FORMAT_SPIFFS_IF_FAILED)) while (true) {}; // Freezing
+  // Initialize SPIFFS
+  if (!setupSPIFFS()) 
+  {
+    DBG.println(F("setupSPIFFS failed, freezing"));
+    while (true) {};
+  }
 
+  // Uncomment for first use or for clearing all paths
+  //formatSPIFFS(); // Uses board_build.partitions in platformio.ini
+
+  setupWiFi(&server);
   setupBNO080();
   setupBLE();
   
@@ -264,7 +272,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  setupWiFi(&server);;
+  
   
   // FreeRTOS
   xQueueSetup();
