@@ -22,7 +22,7 @@ Infrastructure:
 * [RTKRoverManager](https://github.com/jangleboom/RTKRoverManager)
 
 ### Circuit diagram
-![plot](./fritzing/RTKRover-bb.jpg)
+![plot](./fritzing/RTKRover_bb.jpg)
 
 ### Configuration
 To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
