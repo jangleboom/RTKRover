@@ -57,4 +57,4 @@ const char kMountPointPW[] = "YOUR_EMLID_USER_PASSWORD";
 
 ````
 
-If you are not using the web form of the RTKBaseManager, then you have to replace the dynamically read credentials with the constant ones (add the k prefix e. g: mountPoint --> kMountPoint) in the main.cpp.
+If you are not using the web form of the RTKBaseManager, then you have to replace the dynamically read credentials with the constant ones (use the k prefixed values e. g: mountPoint --> kMountPoint) in the main.cpp.
