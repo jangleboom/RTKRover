@@ -9,7 +9,7 @@ Hardware used:
 * SparkFun BNO080 Breakout
 * ublox ANN-MB1 antenna
 * LiPo battery
-* Push button
+* Push button(s)
 * Resistor 10 k
 * Switch
 
