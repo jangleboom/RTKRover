@@ -14,14 +14,14 @@
  *        - Buzzer peep tone if lipo runs out of energy or show an blinky icon/notification in App
  *        
  * @note How to handle WiFi: 
- *        - Push the wipeButton, this will delete old entries in SPIFFS files
+ *        - Push the wipeButton, this will delete old entries in LittleFS files
  *        - Join the AP thats appearing 
  *            -# SSID: RTK-Rover now, later with more devices e. g. "RTKRover_" + ChipID 
  *            -# PW: e. g. "12345678"
  *        - Open address 192.168.4.1 in your browser and set credentials you are 
  *          using for you personal access point on your smartphone
  *        - If the process is done, the LED turns off and the device reboots
- *        - If there are no Wifi credentials stored in the SPIFFS, the device 
+ *        - If there are no Wifi credentials stored in the LittleFS, the device 
  *          will jump in AP mode on startup
  * 
  *       How to measure battery:
@@ -249,15 +249,21 @@ void setup()
   while (!Serial) {};
   #endif
 
-  // Initialize SPIFFS
-  if (!setupSPIFFS()) 
+  //===============================================================================
+  // Initialize LittleFS
+  if (!setupLittleFS()) 
   {
-    DBG.println(F("setupSPIFFS failed, freezing"));
-    while (true) {};
+    formatLittleFS(); // Use board_build.partitions in platformio.ini
   }
 
+  // Uncomment if you want to format (e. g after changing partition sizes)
+  // (And dont forget to comment this again after one run ;)
+  // formatLittleFS();
+  //===============================================================================
+  
+
   // Uncomment for first use or for clearing all paths
-  //formatSPIFFS(); // Uses board_build.partitions in platformio.ini
+  //formatLittleFS(); // Uses board_build.partitions in platformio.ini
 
   setupWiFi(&server);
   setupBNO080();
@@ -398,10 +404,10 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
   // DBG.println(uxHighWaterMark);
 
   // Read credentials
-  String casterHost = readFile(SPIFFS, PATH_RTK_CASTER_HOST);
-  String casterPort = readFile(SPIFFS, PATH_RTK_CASTER_PORT);
-  String casterUser = readFile(SPIFFS, PATH_RTK_CASTER_USER);
-  String mountPoint =  readFile(SPIFFS, PATH_RTK_MOINT_POINT);
+  String casterHost = readFile(LittleFS, PATH_RTK_CASTER_HOST);
+  String casterPort = readFile(LittleFS, PATH_RTK_CASTER_PORT);
+  String casterUser = readFile(LittleFS, PATH_RTK_CASTER_USER);
+  String mountPoint =  readFile(LittleFS, PATH_RTK_MOINT_POINT);
 
   // Check RTK credentials
   bool credentialsExists = true;
@@ -887,7 +893,7 @@ void buttonHandler(Button2 &btn)
   {
     digitalWrite(LED_BUILTIN, HIGH);
     DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
-    wipeSpiffsFiles();
+    wipeLittleFSFiles();
     ESP.restart();
   }
 }
