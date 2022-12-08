@@ -258,13 +258,9 @@ void setup()
 
   // Uncomment if you want to format (e. g after changing partition sizes)
   // (And dont forget to comment this again after one run ;)
-  // formatLittleFS();
+  //formatLittleFS();
   //===============================================================================
   
-
-  // Uncomment for first use or for clearing all paths
-  //formatLittleFS(); // Uses board_build.partitions in platformio.ini
-
   setupWiFi(&server);
   setupBNO080();
   setupBLE();
