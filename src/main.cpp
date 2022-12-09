@@ -251,10 +251,8 @@ void setup()
 
   //===============================================================================
   // Initialize LittleFS
-  if (!setupLittleFS()) 
-  {
-    formatLittleFS(); // Use board_build.partitions in platformio.ini
-  }
+  // Use board_build.partitions in platformio.ini
+  if (!setupLittleFS()) formatLittleFS();
 
   // Uncomment if you want to format (e. g after changing partition sizes)
   // (And dont forget to comment this again after one run ;)
