@@ -249,14 +249,24 @@ void setup()
   while (!Serial) {};
   #endif
 
-  //===============================================================================
+ //===============================================================================
   // Initialize LittleFS
   // Use board_build.partitions in platformio.ini
-  if (!setupLittleFS()) formatLittleFS();
+  if (!setupLittleFS()) 
+  {
+    formatLittleFS();
+    if (!setupLittleFS()) while (true) {};
+  }
 
   // Uncomment if you want to format (e. g after changing partition sizes)
   // (And dont forget to comment this again after one run ;)
   //formatLittleFS();
+
+  //wipeLittleFSFiles();  // Use this for deleting all data
+#ifdef DEBUGGING
+  listFiles();
+  delay(3000);
+#endif
   //===============================================================================
   
   setupWiFi(&server);
