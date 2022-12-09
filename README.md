@@ -58,3 +58,8 @@ const char kMountPointPW[] = "YOUR_EMLID_USER_PASSWORD";
 ````
 
 If you are not using the web form of the RTKBaseManager, then you have to replace the dynamically read credentials with the constant ones (use the k prefixed values e. g: mountPoint --> kMountPoint) in the main.cpp.
+
+
+The mklittlefs file in the root dir you have to [get](https://github.com/earlephilhower/mklittlefs/releases) for for your OS.
+Or if you have Arduino IDE installed, you can borrow it from there. On macOS you can find it here: `~/Library/Arduino15/packages/esp32/tools/mklittlefs/3.0.0-gnu12-dc7f933/mklittlefs`. This project was created on macOS (silicon). 
+
