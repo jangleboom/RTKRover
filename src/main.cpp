@@ -408,10 +408,10 @@ void task_get_rtk_data_over_wifi(void *pvParameters)
   // DBG.println(uxHighWaterMark);
 
   // Read credentials
-  String casterHost = readFile(LittleFS, PATH_RTK_CASTER_HOST);
-  String casterPort = readFile(LittleFS, PATH_RTK_CASTER_PORT);
-  String casterUser = readFile(LittleFS, PATH_RTK_CASTER_USER);
-  String mountPoint =  readFile(LittleFS, PATH_RTK_MOINT_POINT);
+  String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
+  String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
+  String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
+  String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
 
   // Check RTK credentials
   bool credentialsExists = true;
