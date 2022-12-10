@@ -1,7 +1,7 @@
-<img align="right" src="./screenshots/rtkrover.jpg" width="240"/> 
-
 # RTKRover
 ## Headtracker + Real Time Kinematics (RTK rover)
+
+<img align="right" src="./screenshots/rtkrover.jpg" width="240"/> 
 
 Hardware used:   
 * Adafruit Feather ESP32 Huzzah 
