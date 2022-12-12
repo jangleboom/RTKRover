@@ -270,6 +270,11 @@ void setup()
   //===============================================================================
   
   setupWiFi(&server);
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) 
+  {
+    DBG.println(F("Not connected to WiFi..."));
+    delay(3000);
+  }
   setupBNO080();
   setupBLE();
   
