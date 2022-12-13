@@ -661,8 +661,9 @@ void task_wifi_get_rtk_data(void *pvParameters)
       DBG.println(uxHighWaterMark);
       vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
 
-    }
-    xSemaphoreGive(mutexBus);
+      xSemaphoreGive(mutexBus);
+    } /*** End if (xSemaphoreTake(mutexBus, portMAX_DELAY)) ***/
+    
   }
   // Delete self task
   vTaskDelete(NULL);
@@ -732,17 +733,17 @@ void setupBNO080()
   while (!bno080.begin()) 
   {
     // Wait
-    delay(1000);
     DBG.println(F("BNO080 not ready, waiting for I2C..."));
+    delay(500);
   }
     
   // Activate IMU functionalities
-  
   bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);   
   bno080.enableAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
   bno080.enableLinearAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
-  // bno080.enableStepCounter(20);   // Funktioniert sehr schlecht.. 
-  // --> timeBetweenReports should not be 20 ms ;)  try this: 31.25 Hz
+  // bno080.enableStepCounter(20);   // Thomas: Funktioniert sehr schlecht.. 
+  
+  // Markus: --> timeBetweenReports should not be 20 ms ;)  try this: 31.25 Hz
   // bno080.enableStepCounter(32);      
 }
 
