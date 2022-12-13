@@ -451,9 +451,6 @@ void task_wifi_get_rtk_data(void *pvParameters)
 
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
-  // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-  // DBG.print(F("task_wifi_get_rtk_data setup, uxHighWaterMark: "));
-  // DBG.println(uxHighWaterMark);
 
   // Read credentials
   String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
@@ -482,7 +479,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
     /** This ist most of the content beginServing() func from the
      * Sparkfun u-blox GNSS Arduino Library/ZED-F9P/Example15-NTRIPClient 
      * Because I did not wanted to change the code too much if you want to compare
-     * with the Example14 I used of the evil goto as a replace for the return command.
+     * with the Example14 I used of the "evil" goto as a replace for the return command.
      * (A task must not return.)
      */
     taskStart:
@@ -501,9 +498,6 @@ void task_wifi_get_rtk_data(void *pvParameters)
         {
           DBG.println(F("Connection to caster failed, retry in 5s"));
           vTaskDelay(1000/portTICK_PERIOD_MS);
-          /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-          * because return is forbidden in tasks. This is the only use of goto in this code.
-          */
           xSemaphoreGive(mutexBus);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
@@ -573,6 +567,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
             {
               ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
               Serial.println(F("Caster timed out!"));
+
               xSemaphoreGive(mutexBus);
               goto taskStart;
             }
@@ -609,9 +604,6 @@ void task_wifi_get_rtk_data(void *pvParameters)
             DBG.print(F(": "));
             DBG.println(response);
 
-            /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-            * because return is forbiddden in tasks. This is the only use of goto in this code.
-            */
             xSemaphoreGive(mutexBus);
             goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
           }
@@ -648,7 +640,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
           DBG.println(currentTime - lastReceivedRTCM_ms);
           lastReceivedRTCM_ms = currentTime;
           
-          // getPosition();
+          // getPosition(); This is done now in a dedicated task
         }
       }   // End (ntripClient.connected() == true)
 
@@ -658,10 +650,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
         DBG.println(F("RTCM timeout. Disconnecting..."));
         if (ntripClient.connected() == true)
           ntripClient.stop();
-
-        /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-        * because return is forbiddden in tasks. This is the only use of goto in this code.
-        */  
+ 
         xSemaphoreGive(mutexBus);
         goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
       }
