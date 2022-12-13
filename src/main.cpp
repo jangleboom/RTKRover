@@ -208,6 +208,7 @@ typedef struct Coord
 
 const uint8_t QUEUE_SIZE = 2;
 xQueueHandle xQueueAccuracy, xQueueCoord;
+static xSemaphoreHandle mutexBus;
 
 /**
  * @brief Task to get the correction data from the caster server
@@ -223,7 +224,7 @@ void task_wifi_get_rtk_data(void *pvParameters);
  * @param pvParameters 
  */
 
-void task_wifi_get_rtk_location(void *pvParameters);
+void task_wifi_get_rover_position(void *pvParameters);
 /**
  * @brief Task for sending the corrected location data to the
  *        iPhone using BLE
@@ -285,6 +286,12 @@ void setup()
   }
   setupBNO080();
   setupBLE();
+
+  if (!setupGNSS()) 
+  { 
+    DBG.println("setupGNSS() failed! Freezing...");
+    while (true) {};
+  };
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   DBG.print(F("Battery: "));
@@ -298,6 +305,7 @@ void setup()
   
   
   // FreeRTOS
+  mutexBus = xSemaphoreCreateMutex();
   xQueueSetup();
 /*  
   Stack sizes of the tasks. You have to measure the used size in the task (set a high value for first run) and 
@@ -307,11 +315,11 @@ void setup()
   After measurement comment out it again.
 */
   int stack_size_task_wifi_get_rtk_data = 1024 * 7;          // Last measurement: 
-  int stack_size_task_wifi_get_rtk_location = 1024 * 7;      // Last measurement: 5844 
+  int stack_size_task_wifi_get_rover_position = 1024 * 7;      // Last measurement: 5844 
   int stack_size_task_send_bno080_data_via_ble = 1024 * 11;  // Last measurement:
   int stack_size_task_send_rtk_data_via_ble = 1024 * 10;     // Last measurement: 9480
   xTaskCreatePinnedToCore( &task_wifi_get_rtk_data, "task_wifi_get_rtk_data", stack_size_task_wifi_get_rtk_data, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_wifi_get_rtk_location, "task_wifi_get_rtk_location", stack_size_task_wifi_get_rtk_location, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_wifi_get_rover_position, "task_wifi_get_rover_position", stack_size_task_wifi_get_rover_position, NULL, 2, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_via_ble, "task_send_bno080_data_via_ble", stack_size_task_send_bno080_data_via_ble, NULL, TASK_BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_data_via_ble, "task_send_rtk_data_via_ble", stack_size_task_send_rtk_data_via_ble, NULL, TASK_RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
@@ -336,12 +344,20 @@ void loop()
 */
 bool setupGNSS() 
 {
+    while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
+    {
+      DBG.println(F("I2C for RTK not running, check cable!"));
+      delay(500);
+    }
+
+    Wire1.setClock(I2C_FREQUENCY_400K);
+
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
       DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-      vTaskDelay(1000/portTICK_PERIOD_MS);
+      // vTaskDelay(1000/portTICK_PERIOD_MS);
+      delay(500);
     }
-    Wire1.setClock(I2C_FREQUENCY_400K);
 
     bool response = true;
     //Turn off NMEA noise
@@ -388,6 +404,7 @@ void getPosition()
       old_accuracy = accuracy;
     }
   // }
+  DBG.println(F("getPosition"));
 }
 
 /*
@@ -396,7 +413,7 @@ void getPosition()
 =================================================================================
 */
 
-void task_wifi_get_rtk_location(void *pvParameters) 
+void task_wifi_get_rover_position(void *pvParameters) 
 {
   (void)pvParameters;
 
@@ -405,14 +422,20 @@ void task_wifi_get_rtk_location(void *pvParameters)
 
   while (true)
   {
-    getPosition();
+    if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+    {
+      getPosition();
 
-    // Measure stack size (last was 2304)
-    uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    DBG.print(F("task_wifi_get_rtk_location loop, uxHighWaterMark: "));
-    DBG.println(uxHighWaterMark);
+      // Measure stack size (last was 2304)
+      uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      DBG.print(F("task_wifi_get_rover_position loop, uxHighWaterMark: "));
+      DBG.println(uxHighWaterMark);
 
-    vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
+      xSemaphoreGive(mutexBus);
+    }
+   
+    taskYIELD();
+    //vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
 }
@@ -425,18 +448,6 @@ void task_wifi_get_rtk_data(void *pvParameters)
   long lastReceivedRTCM_ms = 0; 
   // If we fail to get a complete RTCM frame after 10s, then disconnect from caster
   const int maxTimeBeforeHangup_ms = 10000; 
-
-  while (!Wire1.begin(RTK_SDA_PIN, RTK_SCL_PIN)) 
-  {
-    DBG.println(F("I2C for RTK not running, check cable!"));
-    vTaskDelay(1000/portTICK_PERIOD_MS);
-  }
-
-  if (!setupGNSS()) 
-  { 
-    DBG.println("setupGNSS() failed! Freezing...");
-    while (true) {};
-  };
 
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
@@ -475,187 +486,194 @@ void task_wifi_get_rtk_data(void *pvParameters)
      * (A task must not return.)
      */
     taskStart:
-
-    if (ntripClient.connected() == false)
+    if (xSemaphoreTake(mutexBus, portMAX_DELAY))
     {
-      // First check WiFi connection
-      while (checkConnectionToWifiStation() == false) {};
-
-      DBG.print(F("Opening socket to "));
-      DBG.println(casterHost.c_str());
-
-      // Attempt connection
-      if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
+      if (ntripClient.connected() == false)
       {
-        DBG.println(F("Connection to caster failed, retry in 5s"));
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-        /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-        * because return is forbidden in tasks. This is the only use of goto in this code.
-        */
-        goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
-      }
-      else
-      {
-        DBG.print(F("Connected to "));
-        DBG.print(casterHost.c_str());
-        DBG.print(F(": "));
-        DBG.println((uint16_t)casterPort.toInt());
+        // First check WiFi connection
+        while (checkConnectionToWifiStation() == false) {};
 
-        DBG.print(F("Requesting NTRIP Data from mount point "));
-        DBG.println(mountPoint.c_str());
+        DBG.print(F("Opening socket to "));
+        DBG.println(casterHost.c_str());
 
-        const int SERVER_BUFFER_SIZE = 512;
-        char serverRequest[SERVER_BUFFER_SIZE];
-
-        snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
-                mountPoint.c_str());
-
-        char credentials[512];
-        if (strlen(casterUser.c_str()) == 0)
+        // Attempt connection
+        if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
         {
-          strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
-        }
-        else
-        {
-          //Pass base64 encoded user:pw
-          char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
-          snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
-
-          DBG.print(F("Sending credentials: "));
-          DBG.println(userCredentials);
-
-#if defined(ARDUINO_ARCH_ESP32)
-          // Encode with ESP32 built-in library
-          base64 b;
-          String strEncodedCredentials = b.encode(userCredentials);
-          char encodedCredentials[strEncodedCredentials.length() + 1];
-          strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
-          snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
-#else
-          // Encode with nfriendly library
-          int encodedLen = base64_enc_len(strlen(userCredentials));
-          char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
-          base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
-#endif
-        }
-
-        strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
-        strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
-
-        DBG.print(F("serverRequest size: "));
-        DBG.print(strlen(serverRequest));
-        DBG.print(F(" of "));
-        DBG.print(sizeof(serverRequest));
-        DBG.println(F(" bytes available"));
-
-        DBG.println(F("Sending server request:"));
-        DBG.println(serverRequest);
-        ntripClient.write(serverRequest, strlen(serverRequest));
-
-        // Wait for response
-        unsigned long timeout = millis();
-        while (ntripClient.available() == 0)
-        {
-          if (millis() - timeout > CONNECTION_TIMEOUT_MS)
-          {
-            ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
-            Serial.println(F("Caster timed out!"));
-            goto taskStart;
-          }
+          DBG.println(F("Connection to caster failed, retry in 5s"));
           vTaskDelay(1000/portTICK_PERIOD_MS);
-        }
-
-        // Check reply
-        bool connectionSuccess = false;
-        char response[512];
-        int responseSpot = 0;
-
-        while (ntripClient.available())
-        {
-          if (responseSpot == sizeof(response) - 1) break;
-
-          response[responseSpot++] = ntripClient.read();
-          if (strstr(response, "200") > 0) // Look for 'ICY 200 OK'
-            connectionSuccess = true;
-          if (strstr(response, "401") > 0) // Look for '401 Unauthorized'
-          {
-            DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
-            connectionSuccess = false;
-          }
-        }
-        response[responseSpot] = '\0';
-
-        DBG.print(F("Caster responded with: "));
-        DBG.println(response);
-
-        if (connectionSuccess == false)
-        {
-          DBG.print(F("Failed to connect to "));
-          DBG.print(casterHost.c_str());
-          DBG.print(F(": "));
-          DBG.println(response);
-
           /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-          * because return is forbiddden in tasks. This is the only use of goto in this code.
+          * because return is forbidden in tasks. This is the only use of goto in this code.
           */
+          xSemaphoreGive(mutexBus);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
         else
         {
           DBG.print(F("Connected to "));
-          DBG.println(casterHost.c_str());
-          lastReceivedRTCM_ms = millis(); // Reset timeout
-        }
-      } // End attempt to connect
-    } // End connected == false
+          DBG.print(casterHost.c_str());
+          DBG.print(F(": "));
+          DBG.println((uint16_t)casterPort.toInt());
 
-    if (ntripClient.connected() == true)
-    {
-      uint8_t rtcmData[512 * 4]; // Most incoming data is around 500 bytes but may be larger
-      rtcmCount = 0;
+          DBG.print(F("Requesting NTRIP Data from mount point "));
+          DBG.println(mountPoint.c_str());
 
-      //Print any available RTCM data
-      while (ntripClient.available())
-      {
-        //DBG.write(ntripClient.read()); // Pipe to serial port is fine but beware, it's a lot of binary data
-        rtcmData[rtcmCount++] = ntripClient.read();
-        if (rtcmCount == sizeof(rtcmData)) break;
-      }
+          const int SERVER_BUFFER_SIZE = 512;
+          char serverRequest[SERVER_BUFFER_SIZE];
 
-      if (rtcmCount > 0)
-      {
-        //Push RTCM to GNSS module over I2C
-        myGNSS.pushRawData(rtcmData, rtcmCount, false);
-        DBG.print(F("RTCM pushed to ZED: "));
-        DBG.println(rtcmCount);
-        uint32_t currentTime = millis();
-        DBG.print(F("Last data before ms: "));
-        DBG.println(currentTime - lastReceivedRTCM_ms);
-        lastReceivedRTCM_ms = currentTime;
-        
-        // getPosition();
-      }
-    }   // End (ntripClient.connected() == true)
+          snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
+                  mountPoint.c_str());
 
-    // Close socket if we don't have new data for 10s
-    if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
-    {
-      DBG.println(F("RTCM timeout. Disconnecting..."));
+          char credentials[512];
+          if (strlen(casterUser.c_str()) == 0)
+          {
+            strncpy(credentials, "Accept: */*\r\nConnection: close\r\n", sizeof(credentials));
+          }
+          else
+          {
+            //Pass base64 encoded user:pw
+            char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
+            snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
+
+            DBG.print(F("Sending credentials: "));
+            DBG.println(userCredentials);
+
+  #if defined(ARDUINO_ARCH_ESP32)
+            // Encode with ESP32 built-in library
+            base64 b;
+            String strEncodedCredentials = b.encode(userCredentials);
+            char encodedCredentials[strEncodedCredentials.length() + 1];
+            strEncodedCredentials.toCharArray(encodedCredentials, sizeof(encodedCredentials)); //Convert String to char array
+            snprintf(credentials, sizeof(credentials), "Authorization: Basic %s\r\n", encodedCredentials);
+  #else
+            // Encode with nfriendly library
+            int encodedLen = base64_enc_len(strlen(userCredentials));
+            char encodedCredentials[encodedLen]; //Create array large enough to house encoded data
+            base64_encode(encodedCredentials, userCredentials, strlen(userCredentials)); //Note: Input array is consumed
+  #endif
+          }
+
+          strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
+          strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
+
+          DBG.print(F("serverRequest size: "));
+          DBG.print(strlen(serverRequest));
+          DBG.print(F(" of "));
+          DBG.print(sizeof(serverRequest));
+          DBG.println(F(" bytes available"));
+
+          DBG.println(F("Sending server request:"));
+          DBG.println(serverRequest);
+          ntripClient.write(serverRequest, strlen(serverRequest));
+
+          // Wait for response
+          unsigned long timeout = millis();
+          while (ntripClient.available() == 0)
+          {
+            if (millis() - timeout > CONNECTION_TIMEOUT_MS)
+            {
+              ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
+              Serial.println(F("Caster timed out!"));
+              xSemaphoreGive(mutexBus);
+              goto taskStart;
+            }
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+          }
+
+          // Check reply
+          bool connectionSuccess = false;
+          char response[512];
+          int responseSpot = 0;
+
+          while (ntripClient.available())
+          {
+            if (responseSpot == sizeof(response) - 1) break;
+
+            response[responseSpot++] = ntripClient.read();
+            if (strstr(response, "200") > 0) // Look for 'ICY 200 OK'
+              connectionSuccess = true;
+            if (strstr(response, "401") > 0) // Look for '401 Unauthorized'
+            {
+              DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
+              connectionSuccess = false;
+            }
+          }
+          response[responseSpot] = '\0';
+
+          DBG.print(F("Caster responded with: "));
+          DBG.println(response);
+
+          if (connectionSuccess == false)
+          {
+            DBG.print(F("Failed to connect to "));
+            DBG.print(casterHost.c_str());
+            DBG.print(F(": "));
+            DBG.println(response);
+
+            /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+            * because return is forbiddden in tasks. This is the only use of goto in this code.
+            */
+            xSemaphoreGive(mutexBus);
+            goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+          }
+          else
+          {
+            DBG.print(F("Connected to "));
+            DBG.println(casterHost.c_str());
+            lastReceivedRTCM_ms = millis(); // Reset timeout
+          }
+        } // End attempt to connect
+      } // End connected == false
+
       if (ntripClient.connected() == true)
-        ntripClient.stop();
+      {
+        uint8_t rtcmData[512 * 4]; // Most incoming data is around 500 bytes but may be larger
+        rtcmCount = 0;
 
-      /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
-      * because return is forbiddden in tasks. This is the only use of goto in this code.
-      */  
-      goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+        //Print any available RTCM data
+        while (ntripClient.available())
+        {
+          //DBG.write(ntripClient.read()); // Pipe to serial port is fine but beware, it's a lot of binary data
+          rtcmData[rtcmCount++] = ntripClient.read();
+          if (rtcmCount == sizeof(rtcmData)) break;
+        }
+
+        if (rtcmCount > 0)
+        {
+          //Push RTCM to GNSS module over I2C
+          myGNSS.pushRawData(rtcmData, rtcmCount, false);
+          DBG.print(F("RTCM pushed to ZED: "));
+          DBG.println(rtcmCount);
+          uint32_t currentTime = millis();
+          DBG.print(F("Last data before ms: "));
+          DBG.println(currentTime - lastReceivedRTCM_ms);
+          lastReceivedRTCM_ms = currentTime;
+          
+          // getPosition();
+        }
+      }   // End (ntripClient.connected() == true)
+
+      // Close socket if we don't have new data for 10s
+      if (millis() - lastReceivedRTCM_ms > maxTimeBeforeHangup_ms)
+      {
+        DBG.println(F("RTCM timeout. Disconnecting..."));
+        if (ntripClient.connected() == true)
+          ntripClient.stop();
+
+        /** Yes, never use goto! But here: it just jumps to the beginning of the task, 
+        * because return is forbiddden in tasks. This is the only use of goto in this code.
+        */  
+        xSemaphoreGive(mutexBus);
+        goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+      }
+
+      // Measure stack size (last was 19320)
+      uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      DBG.print(F("task_wifi_get_rtk_data loop, uxHighWaterMark: "));
+      DBG.println(uxHighWaterMark);
+      vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
+
     }
-
-    // Measure stack size (last was 19320)
-    uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    DBG.print(F("task_wifi_get_rtk_data loop, uxHighWaterMark: "));
-    DBG.println(uxHighWaterMark);
-    vTaskDelay(TASK_RTK_INTERVAL_MS/portTICK_PERIOD_MS);
-
+    xSemaphoreGive(mutexBus);
   }
   // Delete self task
   vTaskDelete(NULL);
