@@ -329,7 +329,7 @@ bool setupGNSS()
 {
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
-      DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
+      DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring and disconnect battery if connected!"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
     Wire1.setClock(I2C_FREQUENCY_400K);
