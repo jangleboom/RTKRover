@@ -191,7 +191,7 @@ void beginClient(void);
  * @brief Get the Position
  * 
  */
-void getPosition(void);
+void updatePosition(void);
 
 /*
 =================================================================================
@@ -224,7 +224,7 @@ void task_wifi_get_rtk_data(void *pvParameters);
  * @param pvParameters 
  */
 
-void task_wifi_get_rover_position(void *pvParameters);
+void task_rtk_get_rover_position(void *pvParameters);
 /**
  * @brief Task for sending the corrected location data to the
  *        iPhone using BLE
@@ -315,11 +315,11 @@ void setup()
   After measurement comment out it again.
 */
   int stack_size_task_wifi_get_rtk_data = 1024 * 7;          // Last measurement: 
-  int stack_size_task_wifi_get_rover_position = 1024 * 7;      // Last measurement: 5844 
+  int stack_size_task_rtk_get_rover_position = 1024 * 7;      // Last measurement: 5844 
   int stack_size_task_send_bno080_data_via_ble = 1024 * 11;  // Last measurement:
   int stack_size_task_send_rtk_data_via_ble = 1024 * 10;     // Last measurement: 9480
   xTaskCreatePinnedToCore( &task_wifi_get_rtk_data, "task_wifi_get_rtk_data", stack_size_task_wifi_get_rtk_data, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_wifi_get_rover_position, "task_wifi_get_rover_position", stack_size_task_wifi_get_rover_position, NULL, 2, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_rtk_get_rover_position, "task_rtk_get_rover_position", stack_size_task_rtk_get_rover_position, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
   xTaskCreatePinnedToCore( &task_send_bno080_data_via_ble, "task_send_bno080_data_via_ble", stack_size_task_send_bno080_data_via_ble, NULL, TASK_BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_data_via_ble, "task_send_rtk_data_via_ble", stack_size_task_send_rtk_data_via_ble, NULL, TASK_RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
@@ -374,7 +374,7 @@ bool setupGNSS()
     return response;
 }
 
-void getPosition() 
+void updatePosition() 
 {
   // static long lastRun = millis();
   static int32_t old_accuracy = -1;
@@ -404,7 +404,7 @@ void getPosition()
       old_accuracy = accuracy;
     }
   // }
-  DBG.println(F("getPosition"));
+  DBG.println(F("updatePosition"));
 }
 
 /*
@@ -413,7 +413,7 @@ void getPosition()
 =================================================================================
 */
 
-void task_wifi_get_rover_position(void *pvParameters) 
+void task_rtk_get_rover_position(void *pvParameters) 
 {
   (void)pvParameters;
 
@@ -422,20 +422,21 @@ void task_wifi_get_rover_position(void *pvParameters)
 
   while (true)
   {
-    if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+    // if (xSemaphoreTake(mutexBus, RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS))
+     if (xSemaphoreTake(mutexBus, portMAX_DELAY))
     {
-      getPosition();
+      updatePosition();
 
       // Measure stack size (last was 2304)
       uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      DBG.print(F("task_wifi_get_rover_position loop, uxHighWaterMark: "));
+      DBG.print(F("task_rtk_get_rover_position loop, uxHighWaterMark: "));
       DBG.println(uxHighWaterMark);
 
       xSemaphoreGive(mutexBus);
     }
    
+    // vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
     taskYIELD();
-    //vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
 }
@@ -483,6 +484,8 @@ void task_wifi_get_rtk_data(void *pvParameters)
      * (A task must not return.)
      */
     taskStart:
+    vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
+    
     if (xSemaphoreTake(mutexBus, portMAX_DELAY))
     {
       if (ntripClient.connected() == false)
@@ -640,7 +643,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
           DBG.println(currentTime - lastReceivedRTCM_ms);
           lastReceivedRTCM_ms = currentTime;
           
-          // getPosition(); This is done now in a dedicated task
+          // updatePosition(); This is done now in a dedicated task
         }
       }   // End (ntripClient.connected() == true)
 
@@ -659,9 +662,6 @@ void task_wifi_get_rtk_data(void *pvParameters)
       uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
       DBG.print(F("task_wifi_get_rtk_data loop, uxHighWaterMark: "));
       DBG.println(uxHighWaterMark);
-      vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
-
-      xSemaphoreGive(mutexBus);
     } /*** End if (xSemaphoreTake(mutexBus, portMAX_DELAY)) ***/
     
   }
