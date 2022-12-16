@@ -35,6 +35,7 @@
  * @version 0.43
  ******************************************************************************/
 
+//TODO: assert failed: vQueueDelete queue.c:2140 (pxQueue) on start
 
 #include <Arduino.h>
 #include <Wire.h> // BNO080 and uBlox GNSS
@@ -224,7 +225,7 @@ void task_wifi_get_rtk_data(void *pvParameters);
  * @param pvParameters 
  */
 
-void task_wifi_get_rover_position(void *pvParameters);
+void task_rtk_get_rover_position(void *pvParameters);
 /**
  * @brief Task for sending the corrected location data to the
  *        iPhone using BLE
@@ -249,7 +250,7 @@ void xQueueSetup(void);
 
 // Globals
 WiFiClient ntripClient;
-
+volatile bool wifiAvailable = false;
 void setup() 
 {
   #ifdef DEBUGGING
@@ -276,23 +277,17 @@ void setup()
   delay(3000);
 #endif
   //===============================================================================
-  
-  setupWiFi(&server);
-  // while (WiFi.waitForConnectResult() != WL_CONNECTED) 
-  while (checkConnectionToWifiStation() == false)
+  wifiAvailable = setupWiFi(&server);
+  if (!wifiAvailable) 
   {
-    DBG.println(F("Not connected to WiFi station"));
-    delay(3000);
-  }
-  setupBNO080();
-  setupBLE();
-
-  if (!setupGNSS()) 
-  { 
-    DBG.println("setupGNSS() failed! Freezing...");
+    DBG.println(F("Wifi setup failed"));
     while (true) {};
-  };
-  
+  }
+
+  // Go not any further in AP mode
+  while (!checkConnectionToWifiStation()) {delay(1000);};
+
+
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   DBG.print(F("Battery: "));
   DBG.print(getBatteryVolts());  
@@ -302,7 +297,9 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  
+  setupBNO080();
+  setupBLE();
+  setupGNSS();
   
   // FreeRTOS
   mutexBus = xSemaphoreCreateMutex();
@@ -315,11 +312,11 @@ void setup()
   After measurement comment out it again.
 */
   int stack_size_task_wifi_get_rtk_data = 1024 * 7;          // Last measurement: 
-  int stack_size_task_wifi_get_rover_position = 1024 * 7;      // Last measurement: 5844 
+  int stack_size_task_rtk_get_rover_position = 1024 * 7;      // Last measurement: 5844 
   int stack_size_task_send_bno080_data_via_ble = 1024 * 11;  // Last measurement:
   int stack_size_task_send_rtk_data_via_ble = 1024 * 10;     // Last measurement: 9480
   xTaskCreatePinnedToCore( &task_wifi_get_rtk_data, "task_wifi_get_rtk_data", stack_size_task_wifi_get_rtk_data, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_wifi_get_rover_position, "task_wifi_get_rover_position", stack_size_task_wifi_get_rover_position, NULL, 2, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_rtk_get_rover_position, "task_rtk_get_rover_position", stack_size_task_rtk_get_rover_position, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_bno080_data_via_ble, "task_send_bno080_data_via_ble", stack_size_task_send_bno080_data_via_ble, NULL, TASK_BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   xTaskCreatePinnedToCore( &task_send_rtk_data_via_ble, "task_send_rtk_data_via_ble", stack_size_task_send_rtk_data_via_ble, NULL, TASK_RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
@@ -413,7 +410,7 @@ void getPosition()
 =================================================================================
 */
 
-void task_wifi_get_rover_position(void *pvParameters) 
+void task_rtk_get_rover_position(void *pvParameters) 
 {
   (void)pvParameters;
 
@@ -428,14 +425,14 @@ void task_wifi_get_rover_position(void *pvParameters)
 
       // Measure stack size (last was 2304)
       uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      DBG.print(F("task_wifi_get_rover_position loop, uxHighWaterMark: "));
+      DBG.print(F("task_rtk_get_rover_position loop, uxHighWaterMark: "));
       DBG.println(uxHighWaterMark);
 
       xSemaphoreGive(mutexBus);
     }
    
-    taskYIELD();
-    //vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
+    // taskYIELD();
+    vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
 }
@@ -488,7 +485,9 @@ void task_wifi_get_rtk_data(void *pvParameters)
       if (ntripClient.connected() == false)
       {
         // First check WiFi connection
-        while (checkConnectionToWifiStation() == false) {};
+        while (checkConnectionToWifiStation() == false) {
+          vTaskDelay(3000/portTICK_PERIOD_MS);
+        };
 
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());
@@ -497,7 +496,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
         if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
         {
           DBG.println(F("Connection to caster failed, retry in 5s"));
-          vTaskDelay(1000/portTICK_PERIOD_MS);
+          vTaskDelay(5000/portTICK_PERIOD_MS);
           xSemaphoreGive(mutexBus);
           goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
         }
