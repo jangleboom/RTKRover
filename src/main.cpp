@@ -376,35 +376,27 @@ bool setupGNSS()
 
 void updatePosition() 
 {
-  // static long lastRun = millis();
   static int32_t old_accuracy = -1;
+  coord_t coord;
 
-  // if (millis() - lastRun > RTK_GET_POSITION_INTERVAL_MS)
-  // { 
-  //   // Update the timer
-  //   lastTime = millis(); 
+  myGNSS.checkUblox();
 
-    coord_t coord;
+  int32_t lat = myGNSS.getHighResLatitude();
+  int8_t latHp = myGNSS.getHighResLatitudeHp();
+  int32_t lon = myGNSS.getHighResLongitude();
+  int8_t lonHp = myGNSS.getHighResLongitudeHp();
+  int32_t accuracy = myGNSS.getPositionAccuracy();
 
-    myGNSS.checkUblox();
+  coord = {.lat = lat, .latHp = latHp, .lon = lon, .lonHp = lonHp};
+  xQueueSend(xQueueCoord, &coord, portMAX_DELAY); 
 
-    int32_t lat = myGNSS.getHighResLatitude();
-    int8_t latHp = myGNSS.getHighResLatitudeHp();
-    int32_t lon = myGNSS.getHighResLongitude();
-    int8_t lonHp = myGNSS.getHighResLongitudeHp();
-    int32_t accuracy = myGNSS.getPositionAccuracy();
+  // Send accuracy if changed only
+  if (accuracy != old_accuracy)
+  {
+    xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
+    old_accuracy = accuracy;
+  }
 
-    coord = {.lat = lat, .latHp = latHp, .lon = lon, .lonHp = lonHp};
-    xQueueSend(xQueueCoord, &coord, portMAX_DELAY); 
-
-    // Send accuracy if changed
-    if (accuracy != old_accuracy)
-    {
-      xQueueSend( xQueueAccuracy, &accuracy, portMAX_DELAY );
-      old_accuracy = accuracy;
-    }
-  // }
-  DBG.println(F("updatePosition"));
 }
 
 /*
@@ -423,20 +415,20 @@ void task_rtk_get_rover_position(void *pvParameters)
   while (true)
   {
     // if (xSemaphoreTake(mutexBus, RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS))
-     if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+    if (xSemaphoreTake(mutexBus, portMAX_DELAY))
     {
       updatePosition();
 
       // Measure stack size (last was 2304)
-      uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      DBG.print(F("task_rtk_get_rover_position loop, uxHighWaterMark: "));
-      DBG.println(uxHighWaterMark);
+      // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      // DBG.print(F("task_rtk_get_rover_position loop, uxHighWaterMark: "));
+      // DBG.println(uxHighWaterMark);
 
       xSemaphoreGive(mutexBus);
     }
    
-    // vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
-    taskYIELD();
+    vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
+    // taskYIELD();
   }
   vTaskDelete(NULL);
 }
@@ -483,11 +475,9 @@ void task_wifi_get_rtk_data(void *pvParameters)
      * with the Example14 I used of the "evil" goto as a replace for the return command.
      * (A task must not return.)
      */
-    taskStart:
-    vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
     
-    if (xSemaphoreTake(mutexBus, portMAX_DELAY))
-    {
+    // if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+    // {
       if (ntripClient.connected() == false)
       {
         // First check WiFi connection
@@ -500,9 +490,9 @@ void task_wifi_get_rtk_data(void *pvParameters)
         if (ntripClient.connect( casterHost.c_str(), (uint16_t)casterPort.toInt() ) == false) 
         {
           DBG.println(F("Connection to caster failed, retry in 5s"));
-          vTaskDelay(1000/portTICK_PERIOD_MS);
-          xSemaphoreGive(mutexBus);
-          goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+          vTaskDelay(5000/portTICK_PERIOD_MS);
+      
+          goto task_end; // replaces the return command from the SparkFun example (a task must not return)
         }
         else
         {
@@ -571,8 +561,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
               ntripClient.stop(); // Too many requests with wrong settings will lead to bann, stop here
               Serial.println(F("Caster timed out!"));
 
-              xSemaphoreGive(mutexBus);
-              goto taskStart;
+              goto task_end;
             }
             vTaskDelay(1000/portTICK_PERIOD_MS);
           }
@@ -607,8 +596,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
             DBG.print(F(": "));
             DBG.println(response);
 
-            xSemaphoreGive(mutexBus);
-            goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
+            goto task_end; // replaces the return command from the SparkFun example (a task must not return)
           }
           else
           {
@@ -635,7 +623,11 @@ void task_wifi_get_rtk_data(void *pvParameters)
         if (rtcmCount > 0)
         {
           //Push RTCM to GNSS module over I2C
-          myGNSS.pushRawData(rtcmData, rtcmCount, false);
+          if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+          {
+            myGNSS.pushRawData(rtcmData, rtcmCount, false);
+            xSemaphoreGive(mutexBus);
+          }
           DBG.print(F("RTCM pushed to ZED: "));
           DBG.println(rtcmCount);
           uint32_t currentTime = millis();
@@ -643,7 +635,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
           DBG.println(currentTime - lastReceivedRTCM_ms);
           lastReceivedRTCM_ms = currentTime;
           
-          // updatePosition(); This is done now in a dedicated task
+          // updatePosition(); //This is done now in a dedicated task
         }
       }   // End (ntripClient.connected() == true)
 
@@ -653,18 +645,21 @@ void task_wifi_get_rtk_data(void *pvParameters)
         DBG.println(F("RTCM timeout. Disconnecting..."));
         if (ntripClient.connected() == true)
           ntripClient.stop();
- 
-        xSemaphoreGive(mutexBus);
-        goto taskStart; // replaces the return command from the SparkFun example (a task must not return)
       }
 
       // Measure stack size (last was 19320)
-      uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      DBG.print(F("task_wifi_get_rtk_data loop, uxHighWaterMark: "));
-      DBG.println(uxHighWaterMark);
-    } /*** End if (xSemaphoreTake(mutexBus, portMAX_DELAY)) ***/
+      // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+      // DBG.print(F("task_wifi_get_rtk_data loop, uxHighWaterMark: "));
+      // DBG.println(uxHighWaterMark);
+    // } /*** End if (xSemaphoreTake(mutexBus, portMAX_DELAY)) ***/
     
+    task_end:
+    
+    // Wait a bit before the next request will be started
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+    // vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
   }
+
   // Delete self task
   vTaskDelete(NULL);
 
@@ -826,7 +821,7 @@ void task_send_rtk_data_via_ble(void *pvParameters)
 
     if (!bleConnected) 
     {
-      DBG.println(F("Waiting for BLE connection"));
+      DBG.println(F("BLE not connected"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
