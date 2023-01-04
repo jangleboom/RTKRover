@@ -92,7 +92,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define TASK_RTK_OVER_BLE_PRIORITY          1     // Real Time Kinematics data to iOS app, (should not break head tracking)
 #define TASK_RTK_BLE_INTERVAL_MS            50    // Send position to iPhone
 #define RTK_GET_POSITION_INTERVAL_MS        50
-#define TASK_WIFI_RTK_DATA_INTERVAL_MS      5000  //200 Get fresh correction data from caster
+#define TASK_WIFI_RTK_DATA_INTERVAL_MS      1000  //200 Get fresh correction data from caster
 #define MIN_ACCEPTABLE_ACCURACY_MM          1000  // Device will only send if accuray is better than this
 #define NAVIGATION_FREQUENCY_HZ             20    // Set solution output to x times a second 
 
