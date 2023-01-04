@@ -825,8 +825,8 @@ void task_send_rtk_data_via_ble(void *pvParameters)
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 
-    // vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
-    taskYIELD();
+    vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+    // taskYIELD();
   } // while (true) ends
   
   // Delete self task
