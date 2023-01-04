@@ -656,8 +656,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
     task_end:
     
     // Wait a bit before the next request will be started
-    vTaskDelay(1000/portTICK_PERIOD_MS);
-    // vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
+    vTaskDelay(TASK_WIFI_RTK_DATA_INTERVAL_MS/portTICK_PERIOD_MS);
   }
 
   // Delete self task
@@ -933,7 +932,9 @@ void buttonHandler(Button2 &btn)
   {
     digitalWrite(LED_BUILTIN, HIGH);
     DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
-    wipeLittleFSFiles();
+    // wipeLittleFSFiles();
+    clearFile(getPath(PARAM_WIFI_SSID).c_str());
+    clearFile(getPath(PARAM_WIFI_PASSWORD).c_str());
     ESP.restart();
   }
 }
