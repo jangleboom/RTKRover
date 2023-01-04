@@ -933,8 +933,8 @@ void buttonHandler(Button2 &btn)
     digitalWrite(LED_BUILTIN, HIGH);
     DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
     // wipeLittleFSFiles();
-    clearFile(getPath(PARAM_WIFI_SSID).c_str());
-    clearFile(getPath(PARAM_WIFI_PASSWORD).c_str());
+    clearPath(getPath(PARAM_WIFI_SSID).c_str());
+    clearPath(getPath(PARAM_WIFI_PASSWORD).c_str());
     ESP.restart();
   }
 }
