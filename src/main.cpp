@@ -51,7 +51,7 @@
 
 using namespace RTKRoverManager;
 
-String deviceName = getDeviceName(DEVICE_TYPE);
+String deviceName = "";
 
 /*
 =================================================================================
@@ -276,7 +276,7 @@ void setup()
   delay(3000);
 #endif
   //===============================================================================
-  
+  deviceName = getDeviceName(DEVICE_TYPE);
   setupWiFi(&server);
   // while (WiFi.waitForConnectResult() != WL_CONNECTED) 
   while (checkConnectionToWifiStation() == false)
@@ -670,7 +670,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
 =================================================================================
 */
 void setupBLE(void)
-{
+{   getDeviceName(DEVICE_TYPE);
     BLEDevice::init(deviceName.c_str());
     BLEServer *pServer = BLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks()); 
@@ -769,18 +769,18 @@ void task_send_rtk_data_via_ble(void *pvParameters)
 
   while (true) 
   {
-    while (bleConnected) 
+    if (bleConnected) 
     {
       if (xQueueReceive( xQueueCoord, &coord, ( TickType_t ) 10 ) == pdPASS) 
       {
-        DBG.print("Received coord.lat = ");
-        DBG.print(coord.lat);
-        DBG.print(", coord.latHp = ");
-        DBG.print(coord.latHp);
-        DBG.print(" coord.lon = ");
-        DBG.print(coord.lon);
-        DBG.print(", coord.lonHp = ");
-        DBG.println(coord.lonHp);
+        // DBG.print("Received coord.lat = ");
+        // DBG.print(coord.lat);
+        // DBG.print(", coord.latHp = ");
+        // DBG.print(coord.latHp);
+        // DBG.print(" coord.lon = ");
+        // DBG.print(coord.lon);
+        // DBG.print(", coord.lonHp = ");
+        // DBG.println(coord.lonHp);
         lat = coord.lat;
         latHp = coord.latHp;
         lon = coord.lon;
@@ -806,9 +806,9 @@ void task_send_rtk_data_via_ble(void *pvParameters)
         pRTKAccuracyCharacteristic->setValue(accuracyStr.c_str());
         pRTKAccuracyCharacteristic->notify();
 
-        DBG.print(F("Received accuracy = "));
-        DBG.print(accuracy);
-        DBG.println(F(" mm"));
+        // DBG.print(F("Received accuracy = "));
+        // DBG.print(accuracy);
+        // DBG.println(F(" mm"));
       }
     
       /*  Measure stack size (last was 9356) */
@@ -931,10 +931,17 @@ void buttonHandler(Button2 &btn)
   if (btn == wipeButton) 
   {
     digitalWrite(LED_BUILTIN, HIGH);
-    DBG.println(F("Wiping WiFi credentials and RTK settings from memory..."));
-    // wipeLittleFSFiles();
+    
+    // Clear whole memory
+    //DBG.println(F("Wiping whole memory..."));
+    //wipeLittleFSFiles();
+
+    // OR
+    // clear just WiFi credentials
+    DBG.println(F("Wiping WiFi credentials from memory..."));
     clearPath(getPath(PARAM_WIFI_SSID).c_str());
     clearPath(getPath(PARAM_WIFI_PASSWORD).c_str());
+    
     ESP.restart();
   }
 }
