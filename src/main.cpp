@@ -51,8 +51,6 @@
 
 using namespace RTKRoverManager;
 
-String deviceName = "";
-
 /*
 =================================================================================
                                 Buttons
@@ -276,7 +274,7 @@ void setup()
   delay(3000);
 #endif
   //===============================================================================
-  deviceName = getDeviceName(DEVICE_TYPE);
+ 
   setupWiFi(&server);
   // while (WiFi.waitForConnectResult() != WL_CONNECTED) 
   while (checkConnectionToWifiStation() == false)
@@ -670,7 +668,8 @@ void task_wifi_get_rtk_data(void *pvParameters)
 =================================================================================
 */
 void setupBLE(void)
-{   getDeviceName(DEVICE_TYPE);
+{   
+    String deviceName = getDeviceName(DEVICE_TYPE);
     BLEDevice::init(deviceName.c_str());
     BLEServer *pServer = BLEDevice::createServer();
     pServer->setCallbacks(new MyServerCallbacks()); 
