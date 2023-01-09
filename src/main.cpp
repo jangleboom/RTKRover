@@ -214,7 +214,7 @@ static xSemaphoreHandle mutexBus;
  * 
  * @param pvParameters Void pointer, no parameter used here
  */
-void task_wifi_get_rtk_data(void *pvParameters);
+void task_rtk_get_corrrection_data(void *pvParameters);
 
 /**
  * @brief Task to get location data
@@ -229,7 +229,7 @@ void task_rtk_get_rover_position(void *pvParameters);
  * 
  * @param pvParameters Void pointer, no parameter used here
  */
-void task_send_rtk_data_via_ble(void *pvParameters);
+void task_send_rtk_position_via_ble(void *pvParameters);
 
 /**
  * @brief Task for sending the BNO080 position data to the
@@ -237,7 +237,7 @@ void task_send_rtk_data_via_ble(void *pvParameters);
  * 
  * @param pvParameters Void pointer, no parameter used here
  */
-void task_send_bno080_data_via_ble(void *pvParameters);
+void task_bno_orientation_via_ble(void *pvParameters);
 
 /**
  * @brief Create the queues with the right size
@@ -302,8 +302,6 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-  
-  
   // FreeRTOS
   mutexBus = xSemaphoreCreateMutex();
   xQueueSetup();
@@ -314,14 +312,15 @@ void setup()
   For measurement you need to uncomment the uxHighWaterMark related code in the task (setup and loop).
   After measurement comment out it again.
 */
-  int stack_size_task_wifi_get_rtk_data = 1024 * 7;          // Last measurement: 
+  int stack_size_task_rtk_get_corrrection_data = 1024 * 7;          // Last measurement: 
   int stack_size_task_rtk_get_rover_position = 1024 * 7;      // Last measurement: 5844 
-  int stack_size_task_send_bno080_data_via_ble = 1024 * 11;  // Last measurement:
-  int stack_size_task_send_rtk_data_via_ble = 1024 * 10;     // Last measurement: 9480
-  xTaskCreatePinnedToCore( &task_wifi_get_rtk_data, "task_wifi_get_rtk_data", stack_size_task_wifi_get_rtk_data, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_rtk_get_rover_position, "task_rtk_get_rover_position", stack_size_task_rtk_get_rover_position, NULL, TASK_RTK_OVER_WIFI_PRIORITY, NULL, RUNNING_CORE_0);
-  xTaskCreatePinnedToCore( &task_send_bno080_data_via_ble, "task_send_bno080_data_via_ble", stack_size_task_send_bno080_data_via_ble, NULL, TASK_BNO080_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
-  xTaskCreatePinnedToCore( &task_send_rtk_data_via_ble, "task_send_rtk_data_via_ble", stack_size_task_send_rtk_data_via_ble, NULL, TASK_RTK_OVER_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  int stack_size_task_bno_orientation_via_ble = 1024 * 11;  // Last measurement:
+  int stack_size_task_send_rtk_position_via_ble = 1024 * 10;     // Last measurement: 9480
+  
+  xTaskCreatePinnedToCore( &task_rtk_get_corrrection_data, "task_rtk_get_corrrection_data", stack_size_task_rtk_get_corrrection_data, NULL, TASK_RTK_GET_CORR_DATA_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_rtk_get_rover_position, "task_rtk_get_rover_position", stack_size_task_rtk_get_rover_position, NULL, TASK_RTK_GET_POSITION_PRIORITY, NULL, RUNNING_CORE_0);
+  xTaskCreatePinnedToCore( &task_bno_orientation_via_ble, "task_bno_orientation_via_ble", stack_size_task_bno_orientation_via_ble, NULL, TASK_BNO080_VIA_BLE_PRIORITY, NULL, RUNNING_CORE_1);
+  xTaskCreatePinnedToCore( &task_send_rtk_position_via_ble, "task_send_rtk_position_via_ble", stack_size_task_send_rtk_position_via_ble, NULL, TASK_RTK_POSITION_VIA_BLE_PRIORITY, NULL, RUNNING_CORE_1);
   
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
@@ -414,7 +413,6 @@ void task_rtk_get_rover_position(void *pvParameters)
 
   while (true)
   {
-    // if (xSemaphoreTake(mutexBus, RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS))
     if (xSemaphoreTake(mutexBus, portMAX_DELAY))
     {
       updatePosition();
@@ -427,13 +425,12 @@ void task_rtk_get_rover_position(void *pvParameters)
       xSemaphoreGive(mutexBus);
     }
    
-    vTaskDelay(RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
-    // taskYIELD();
+    vTaskDelay(TASK_RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
 }
 
-void task_wifi_get_rtk_data(void *pvParameters) 
+void task_rtk_get_corrrection_data(void *pvParameters) 
 {
   (void)pvParameters;
 
@@ -649,7 +646,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
 
       // Measure stack size (last was 19320)
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      // DBG.print(F("task_wifi_get_rtk_data loop, uxHighWaterMark: "));
+      // DBG.print(F("task_rtk_get_corrrection_data loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
     // } /*** End if (xSemaphoreTake(mutexBus, portMAX_DELAY)) ***/
     
@@ -662,7 +659,7 @@ void task_wifi_get_rtk_data(void *pvParameters)
   // Delete self task
   vTaskDelete(NULL);
 
-} /*** end task_wifi_get_rtk_data ***/
+} /*** end task_rtk_get_corrrection_data ***/
 
 /*
 =================================================================================
@@ -748,7 +745,7 @@ void xQueueSetup()
   xQueueAccuracy  = xQueueCreate( QUEUE_SIZE, sizeof( long ) );
 }
 
-void task_send_rtk_data_via_ble(void *pvParameters) 
+void task_send_rtk_position_via_ble(void *pvParameters) 
 {
   (void)pvParameters;
   
@@ -765,7 +762,7 @@ void task_send_rtk_data_via_ble(void *pvParameters)
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-  // DBG.print(F("task_send_rtk_data_via_ble setup, uxHighWaterMark: "));
+  // DBG.print(F("task_send_rtk_position_via_ble setup, uxHighWaterMark: "));
   // DBG.println(uxHighWaterMark);
 
   while (true) 
@@ -814,7 +811,7 @@ void task_send_rtk_data_via_ble(void *pvParameters)
     
       /*  Measure stack size (last was 9356) */
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-      // DBG.print(F("task_send_rtk_data_via_ble loop, uxHighWaterMark: "));
+      // DBG.print(F("task_send_rtk_position_via_ble loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
     } /*** while (bleConnected) ends ***/
@@ -833,7 +830,7 @@ void task_send_rtk_data_via_ble(void *pvParameters)
   vTaskDelete(NULL);
 }
 
-void task_send_bno080_data_via_ble(void *pvParameters) 
+void task_bno_orientation_via_ble(void *pvParameters) 
 {
     (void)pvParameters;
 
@@ -852,7 +849,7 @@ void task_send_bno080_data_via_ble(void *pvParameters)
     // Measure stack size
     UBaseType_t uxHighWaterMark;
     // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-    // DBG.print(F("task_send_bno080_data_via_ble setup, uxHighWaterMark: "));
+    // DBG.print(F("task_bno_orientation_via_ble setup, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
 
     while (true) 
@@ -899,14 +896,16 @@ void task_send_bno080_data_via_ble(void *pvParameters)
         }
         // Measure stack size
         // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DBG.print(F("task_send_bno080_data_via_ble loop, uxHighWaterMark: "));
+        // DBG.print(F("task_bno_orientation_via_ble loop, uxHighWaterMark: "));
         // DBG.println(uxHighWaterMark);
-        taskYIELD();
+
+        vTaskDelay(TASK_BNO_ORIENTATION_VIA_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
+        // taskYIELD(); // 11.25 ms is the BLE connection interval, makes no sense to try to send faster
     }
     // Delete self task
     vTaskDelete(NULL);
 
-} /*** end task_send_bno080_data_via_ble ***/
+} /*** end task_bno_orientation_via_ble ***/
 
 /*
 =================================================================================

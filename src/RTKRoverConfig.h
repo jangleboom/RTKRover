@@ -83,18 +83,20 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
                                 FreeRTOS settings
 =================================================================================
 */
-#define RUNNING_CORE_0                      0     // Low level WiFi code runs on core 0
-#define RUNNING_CORE_1                      1     // Use core 1 for all other tasks
+#define RUNNING_CORE_0                                  0     // Low level WiFi code runs on core 0
+#define RUNNING_CORE_1                                  1     // Use core 1 for all other tasks
 // Each task is assigned a priority from 0 to ( configMAX_PRIORITIES - 1 ), 
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
-#define TASK_RTK_OVER_WIFI_PRIORITY         2     // GNSS should have a lower priority than BNO080 data transmission
-#define TASK_BNO080_OVER_BLE_PRIORITY       2     // Headtracking: highest priority for immersive audio
-#define TASK_RTK_OVER_BLE_PRIORITY          2     // Real Time Kinematics data to iOS app, (should not break head tracking)
-#define TASK_RTK_BLE_INTERVAL_MS            50    // Send position to iPhone
-#define RTK_GET_POSITION_INTERVAL_MS        50
-#define TASK_WIFI_RTK_DATA_INTERVAL_MS      1000  //200 Get fresh correction data from caster
-#define MIN_ACCEPTABLE_ACCURACY_MM          1000  // Device will only send if accuray is better than this
-#define NAVIGATION_FREQUENCY_HZ             20    // Set solution output to x times a second 
+#define TASK_RTK_GET_CORR_DATA_PRIORITY                 2     // GNSS should have a lower priority than BNO080 data transmission
+#define TASK_RTK_GET_POSITION_PRIORITY                  2
+#define TASK_BNO080_VIA_BLE_PRIORITY                    1     // Headtracking: highest priority for immersive audio
+#define TASK_RTK_POSITION_VIA_BLE_PRIORITY              2     // Real Time Kinematics data to iOS app, (should not break head tracking)
+#define TASK_RTK_BLE_INTERVAL_MS                      100    // Send position to iPhone
+#define TASK_RTK_GET_POSITION_INTERVAL_MS             100
+#define TASK_BNO_ORIENTATION_VIA_BLE_INTERVAL_MS       12
+#define TASK_WIFI_RTK_DATA_INTERVAL_MS               1000  //200 Get fresh correction data from caster
+#define MIN_ACCEPTABLE_ACCURACY_MM                   1000  // Device will only send if accuray is better than this
+#define NAVIGATION_FREQUENCY_HZ                        20    // Set solution output to x times a second 
 
 /* 
 The module supports RTK update frequencies ranging from 8 Hz (BeiDou, Galileo, GLONASS, GPS) to 
