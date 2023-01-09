@@ -461,10 +461,11 @@ void task_rtk_get_corrrection_data(void *pvParameters)
     while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
   }
 
+  // WiFi reconnect if fails
+  const uint8_t kMaxAttempts = 2;
+  uint8_t attempts = 0;
   // WiFiClient ntripClient;
   long rtcmCount = 0;
-
-  uint8_t attempts = 0;
 
   while (true) // Task loop begins
   {
@@ -483,7 +484,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           attempts++;
           vTaskDelay(1000/portTICK_PERIOD_MS);
 
-          if (attempts > 2) 
+          if (attempts > kMaxAttempts) 
           {
             setupWiFi(&server);
             attempts = 0;
