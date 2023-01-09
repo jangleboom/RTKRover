@@ -464,6 +464,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   // WiFiClient ntripClient;
   long rtcmCount = 0;
 
+  uint8_t attempts = 0;
+
   while (true) // Task loop begins
   {
     /** This ist most of the content beginServing() func from the
@@ -473,12 +475,20 @@ void task_rtk_get_corrrection_data(void *pvParameters)
      * (A task must not return.)
      */
     
-    // if (xSemaphoreTake(mutexBus, portMAX_DELAY))
-    // {
       if (ntripClient.connected() == false)
       {
         // First check WiFi connection
-        while (checkConnectionToWifiStation() == false) {};
+        while (checkConnectionToWifiStation() == false) 
+        {
+          attempts++;
+          vTaskDelay(1000/portTICK_PERIOD_MS);
+
+          if (attempts > 2) 
+          {
+            setupWiFi(&server);
+            attempts = 0;
+          }
+        };
 
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());

@@ -89,7 +89,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 // where configMAX_PRIORITIES is defined within FreeRTOSConfig.h.
 #define TASK_RTK_GET_CORR_DATA_PRIORITY                 2     // GNSS should have a lower priority than BNO080 data transmission
 #define TASK_RTK_GET_POSITION_PRIORITY                  2
-#define TASK_BNO080_VIA_BLE_PRIORITY                    1     // Headtracking: highest priority for immersive audio
+#define TASK_BNO080_VIA_BLE_PRIORITY                    2     // Headtracking: highest priority for immersive audio
 #define TASK_RTK_POSITION_VIA_BLE_PRIORITY              2     // Real Time Kinematics data to iOS app, (should not break head tracking)
 #define TASK_RTK_BLE_INTERVAL_MS                      100    // Send position to iPhone
 #define TASK_RTK_GET_POSITION_INTERVAL_MS             100
