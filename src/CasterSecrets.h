@@ -14,6 +14,9 @@ const char kMountPoint[] = "rtkberlin";
 const char kCasterUser[] = "mr.markuese@fmail.com"; 
 const char kWifiSsid[] = "Loewenzahn";
 const char kWifiPw[] = "vollverschluesselt1312!";
+
+// Device name (this rover with headtracking)
+const char kDeviceName[] = "rtkrover";
 // Wifi access
 // const char kWifiSsid[] = "ssid_without_spaces";
 // const char kWifiPw[] = "***";

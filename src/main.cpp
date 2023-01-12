@@ -274,7 +274,12 @@ void setup()
   delay(3000);
 #endif
   //===============================================================================
- 
+  // Read Wifi credentials from header and save them into LittleFS, so the RTKRoverManger
+  // needs no API change for this special use case in Basel 01/2023
+  // (Reason: Users could accidentally press the wipe button)
+  writeFile(LittleFS, getPath(PARAM_WIFI_SSID).c_str(), kWifiSsid);
+  writeFile(LittleFS, getPath(PARAM_WIFI_PASSWORD).c_str(), kWifiPw);
+  writeFile(LittleFS, getPath(PARAM_DEVICE_NAME).c_str(), kDeviceName);
   setupWiFi(&server);
 
   while (checkConnectionToWifiStation() == false)
@@ -305,7 +310,7 @@ void setup()
   DBG.print(getBatteryVolts());  
   DBG.println(" V");
 
-  wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
+  // wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
@@ -340,7 +345,7 @@ void loop()
   aunit::TestRunner::run();
   #endif
 
-  wipeButton.loop();
+  // wipeButton.loop();
 }
 
 /*
@@ -450,12 +455,11 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   UBaseType_t uxHighWaterMark; 
 
   // Read credentials
-  String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
-  String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
-  String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
-  String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
-  String casterUserPW = kCasterUserPw; // No password needed, but it is defined in CasterSecrets.h
-  
+  String casterHost =   kCasterHost;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
+  String casterPort =   kCasterPort;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
+  String casterUser =   kCasterUser;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
+  String mountPoint =   kMountPoint;//readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
+  String casterUserPW = kCasterUserPw;
   // Check RTK credentials
   bool credentialsExists = true;
   credentialsExists &= !casterHost.isEmpty();
@@ -533,7 +537,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           }
           else
           {
-            //Pass base64 encoded user:pw
+            // Pass base64 encoded user:pw
             char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
             snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
 
