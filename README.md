@@ -32,26 +32,19 @@ To connect to a caster you need to create a secrets.h file with your credentials
 #define CASTER_SECRETS_H
 // A place for your caster credentials
 
-// RTK2Go MountPoint http://www.rtk2go.com:2101/SNIP::STATUS#uptime
-// Email: YOUR_ACCOUNT_EMAIL.COM
-const char kCasterHost[] = "rtk2go.com";
-const uint16_t kCasterPort = 2101;
-const char kMountPoint[] = "YOUR_RTK2GO_MOUNT_POINT";       //The mount point you want to push data to
-const char kCasterUser[] = "YOUR_RTK2GO_ACCOUNT_EMAIL.COM";  //User must provide their own email address to use RTK2Go
-const char kCasterUserPW[] = "";
+// RTK2Go http://www.rtk2go.com:2101/SNIP::STATUS#uptime
 
-// Or
+const char kCasterHost[] = "rtk2go.com"; 
+const char kCasterPort[] = "2101";
+const char kMountPoint[] = "YOUR_MOUNT_POINT";
+const char kCasterUser[] = "YOUR_USER_EMAIL";       // User must provide their own email address to use RTK2Go
+const char kCasterUserPw[] = "";                    // This can be added to the web form if you want to use a PW here, it's not neccecary
 
-// Another free NTRIP Caster is Emlid
-// Emlid Caster MountPoint
-// Email: YOUR_ACCOUNT_EMAIL.COM
-const char kCasterHost[] = "caster.emlid.com";
-const uint16_t kCasterPort = 2101;
-const char kCasterUser[] = "YOUR_EMLID_USER_NAME";   //User name and pw must be obtained through their web portal
-const char kMountPoint[] = "YOUR_EMLID_MOUNT_POINT"; //The mount point you want to push data to
-const char kMountPointPW[] = "YOUR_EMLID_USER_PASSWORD";
-
-// Use only one of this choices!
+// Device name 
+const char kDeviceName[] = "YOUR_ROVER_DEVICE_NAME"; // e. g. "rover123"          
+// Wifi access
+const char kWifiSsid[] = "YOUR_SSID_WITHOUT_SPACES"; // Wifi to connect the rover with
+const char kWifiPw[] = "YOUR_WIFI_PASSWORD";
 
 #endif /*** CASTER_SECRETS_H ***/
 
@@ -63,3 +56,4 @@ If you are not using the web form of the RTKBaseManager, then you have to replac
 The mklittlefs file in the root dir you have to [get](https://github.com/earlephilhower/mklittlefs/releases) depending on your OS.
 If you have the Arduino IDE installed, you can borrow it from there too. On macOS you can find it here: `~/Library/Arduino15/packages/esp32/tools/mklittlefs/3.0.0-gnu12-dc7f933/mklittlefs`.  Help for setup the file system you can find [here](https://randomnerdtutorials.com/esp8266-nodemcu-vs-code-platformio-littlefs/). This project was created on macOS (silicon).
 
+[Support RTK2GO](http://new.rtk2go.com/donations-and-support/)
