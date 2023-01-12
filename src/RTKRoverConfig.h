@@ -97,7 +97,7 @@ BUT: we use here two I2C connections for real parallel computing on two cores.
 #define TASK_WIFI_RTK_DATA_INTERVAL_MS               1000  //200 Get fresh correction data from caster
 #define MIN_ACCEPTABLE_ACCURACY_MM                   1000  // Device will only send if accuray is better than this
 #define NAVIGATION_FREQUENCY_HZ                        20    // Set solution output to x times a second 
-
+#define CONNECTION_TIMEOUT_MS                       10000
 /* 
 The module supports RTK update frequencies ranging from 8 Hz (BeiDou, Galileo, GLONASS, GPS) to 
 20 Hz (GPS only), velocity and dynamic heading accuracies of 0.05 m/s and 0.3° respectively and a 

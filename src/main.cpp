@@ -454,7 +454,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
   String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
   String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
-
+  String casterUserPW = kCasterUserPw; // No password needed, but it is defined in CasterSecrets.h
+  
   // Check RTK credentials
   bool credentialsExists = true;
   credentialsExists &= !casterHost.isEmpty();
