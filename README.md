@@ -25,7 +25,7 @@ Infrastructure:
 ![plot](./fritzing/RTKRover_bb.jpg)
 
 ### Configuration
-To connect to a caster you need to create a secrets.h file with your credentials that looks like this:
+To connect to a caster you need to create a secrets.h file with your credentials that lives in your src folder and looks like this:
 
 ````
 #ifndef CASTER_SECRETS_H
