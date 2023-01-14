@@ -159,6 +159,7 @@ void setupBNO080(void);
 =================================================================================
 */
 long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
+bool beginPositioning = false;  // Wait with positioning for first correction data from caster
 
 // The ESP32 core has a built in base64 library but not every platform does
 // We'll use an external lib if necessary.
@@ -423,6 +424,9 @@ void task_rtk_get_rover_position(void *pvParameters)
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
 
+  // Wait for first correction data
+  while ( ! beginPositioning) { vTaskDelay(1000/portTICK_PERIOD_MS); }
+
   while (true)
   {
     if (xSemaphoreTake(mutexBus, portMAX_DELAY))
@@ -646,6 +650,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           if (xSemaphoreTake(mutexBus, portMAX_DELAY))
           {
             myGNSS.pushRawData(rtcmData, rtcmCount, false);
+            beginPositioning = true; // Don't start positioning before correction data is pushed to ZED
             xSemaphoreGive(mutexBus);
           }
           DBG.print(F("RTCM pushed to ZED: "));
