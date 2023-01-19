@@ -478,9 +478,9 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   }
 
   // WiFi reconnect if fails
-  const uint8_t kMaxAttempts = 2;
-  uint8_t attempts = 0;
-  // WiFiClient ntripClient;
+  // const uint8_t kMaxAttempts = 2;
+  // uint8_t attempts = 0;
+  // // WiFiClient ntripClient;
   long rtcmCount = 0;
 
   while (true) // Task loop begins
@@ -497,14 +497,14 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         // First check WiFi connection
         while (checkConnectionToWifiStation() == false) 
         {
-          attempts++;
+          // attempts++;
           vTaskDelay(1000/portTICK_PERIOD_MS);
 
-          if (attempts > kMaxAttempts) 
-          {
-            setupWiFi(&server);
-            attempts = 0;
-          }
+        //   if (attempts > kMaxAttempts) 
+        //   {
+        //     setupWiFi(&server);
+        //     attempts = 0;
+        //   }
         };
 
         DBG.print(F("Opening socket to "));
