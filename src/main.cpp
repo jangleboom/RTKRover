@@ -977,8 +977,8 @@ void buttonHandler(Button2 &btn)
 
 void blinkOneTime(int blinkTime)
 {
-  digitalWrite(BUILTIN_LED, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
   delay(blinkTime);
-  digitalWrite(BUILTIN_LED, HIGH);
+  digitalWrite(LED_BUILTIN, HIGH);
   delay(blinkTime);
 }
