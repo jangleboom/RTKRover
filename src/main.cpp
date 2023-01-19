@@ -247,8 +247,10 @@ void task_bno_orientation_via_ble(void *pvParameters);
 void xQueueSetup(void);
 
 // Globals
-WiFiClient ntripClient;
+// WiFiClient ntripClient;
 
+void blinkOneTime(int blinkTime);
+   
 void setup() 
 {
   #ifdef DEBUGGING
@@ -303,7 +305,7 @@ void setup()
   if (!setupGNSS()) 
   { 
     DBG.println("setupGNSS() failed! Freezing...");
-    while (true) {};
+    while (true) blinkOneTime(1000);
   };
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
@@ -367,8 +369,7 @@ bool setupGNSS()
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
       DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-      // vTaskDelay(1000/portTICK_PERIOD_MS);
-      delay(500);
+      blinkOneTime(500);
     }
 
     bool response = true;
@@ -972,4 +973,12 @@ void buttonHandler(Button2 &btn)
     
     ESP.restart();
   }
+}
+
+void blinkOneTime(int blinkTime)
+{
+  digitalWrite(BUILTIN_LED, LOW);
+  delay(blinkTime);
+  digitalWrite(BUILTIN_LED, HIGH);
+  delay(blinkTime);
 }
