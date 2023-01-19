@@ -419,7 +419,7 @@ void task_rtk_get_rover_position(void *pvParameters)
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
 
-  // Wait for first correction data
+  // Wait for first correction data<
   while ( ! beginPositioning) { vTaskDelay(1000/portTICK_PERIOD_MS); }
 
   while (true)
@@ -977,7 +977,7 @@ void buttonHandler(Button2 &btn)
 void blinkOneTime(int blinkTime)
 {
   digitalWrite(LED_BUILTIN, LOW);
-  delay(blinkTime);
+  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
   digitalWrite(LED_BUILTIN, HIGH);
-  delay(blinkTime);
+  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
 }
