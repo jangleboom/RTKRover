@@ -1,0 +1,8 @@
+.pio
+.vscode
+.DS_Store
+.o
+.a
+.elf
+# lib/*
+src/CasterSecrets.h
