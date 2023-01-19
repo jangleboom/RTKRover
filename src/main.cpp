@@ -480,7 +480,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   // WiFi reconnect if fails
   // const uint8_t kMaxAttempts = 2;
   // uint8_t attempts = 0;
-  // // WiFiClient ntripClient;
+  WiFiClient ntripClient;
   long rtcmCount = 0;
 
   while (true) // Task loop begins
