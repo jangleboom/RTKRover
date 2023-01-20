@@ -25,6 +25,24 @@ Infrastructure:
 ![plot](./fritzing/RTKRover_bb.jpg)
 
 ### Configuration
+
+BNO080:
+
+In main.cpp line 763 (or near) you can choose the way of sensor fusion in the BNO080.
+
+````
+  // Activate IMU functionalities
+  // bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);  
+  // bno080.enableGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);  
+  bno080.enableARVRStabilizedRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);
+
+`````
+
+more information in the [datasheet](https://www.ceva-dsp.com/wp-content/uploads/2019/10/BNO080_085-Datasheet.pdf)
+
+
+ZED-F9P:
+
 To connect to a caster you need to create a secrets.h file with your credentials that lives in your src folder and looks like this:
 
 ````
