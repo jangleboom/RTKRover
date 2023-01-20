@@ -82,4 +82,4 @@ If you have the Arduino IDE installed, you can borrow it from there too. On macO
 * 0.5 s RTK: setupGNSS() failed (I2C setup)
 * 1.0 s	RTK: setupGNSS() failed (I2C communication)
 * 2.0 s RTK: credentialsExists false
-* 1 s : 0.1 s WiFi: connection to AP lost
+* 1.0 s : 0.1 s WiFi: connection to AP lost
