@@ -461,11 +461,12 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   UBaseType_t uxHighWaterMark; 
 
   // Read credentials
-  String casterHost =   kCasterHost;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
-  String casterPort =   kCasterPort;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
-  String casterUser =   kCasterUser;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
-  String mountPoint =   kMountPoint;//readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
-  String casterUserPW = kCasterUserPw;
+  String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
+  String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
+  String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
+  String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
+  String casterUserPW = kCasterUserPw; // No password needed, but it is defined in CasterSecrets.h
+  
   // Check RTK credentials
   bool credentialsExists = true;
   credentialsExists &= !casterHost.isEmpty();
@@ -476,7 +477,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!credentialsExists) 
   {
     DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    blinkOneTime(2000);
+    while (true) { delay(1000); };
   }
 
   // WiFi reconnect if fails
@@ -501,7 +502,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         while (checkConnectionToWifiStation() == false) 
         {
           // attempts++;
-          vTaskDelay(1000/portTICK_PERIOD_MS);
+          blinkOneTime(1000);
+          blinkOneTime(500);
 
           // if (attempts > kMaxAttempts) 
           // {
@@ -544,7 +546,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           }
           else
           {
-            // Pass base64 encoded user:pw
+            //Pass base64 encoded user:pw
             char userCredentials[(casterUser.length()+1) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
             snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser.c_str(), casterUserPW);
 
@@ -566,9 +568,11 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   #endif
           }
 
+          // This warning comes because source and destination have the same size, 
+          // but it is large enough and the buffer should not be full at any time.
           strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
           strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
-
+          DBG.printf("serverRequest len: %d", strlen(serverRequest));
           DBG.print(F("serverRequest size: "));
           DBG.print(strlen(serverRequest));
           DBG.print(F(" of "));
@@ -578,7 +582,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           DBG.println(F("Sending server request:"));
           DBG.println(serverRequest);
           ntripClient.write(serverRequest, strlen(serverRequest));
-
+          
           // Wait for response
           unsigned long timeout = millis();
           while (ntripClient.available() == 0)
@@ -653,7 +657,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           if (xSemaphoreTake(mutexBus, portMAX_DELAY))
           {
             myGNSS.pushRawData(rtcmData, rtcmCount, false);
-            beginPositioning = true; // Don't start positioning before correction data is pushed to ZED
+            beginPositioning = true;
             xSemaphoreGive(mutexBus);
           }
           DBG.print(F("RTCM pushed to ZED: "));
@@ -794,6 +798,8 @@ void task_send_rtk_position_via_ble(void *pvParameters)
   int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
+  while (!bleConnected) blinkOneTime(100);
+
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
   // DBG.print(F("task_send_rtk_position_via_ble setup, uxHighWaterMark: "));
@@ -848,13 +854,12 @@ void task_send_rtk_position_via_ble(void *pvParameters)
       // DBG.print(F("task_send_rtk_position_via_ble loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
-    } /*** while (bleConnected) ends ***/
-
-    if (!bleConnected) 
+    } /*** if (bleConnected) ends ***/
+    else
     {
-      DBG.println(F("BLE not connected"));
-      vTaskDelay(1000/portTICK_PERIOD_MS);
+      blinkOneTime(100);
     }
+ 
 
     vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
     // taskYIELD();
@@ -982,8 +987,8 @@ void buttonHandler(Button2 &btn)
 
 void blinkOneTime(int blinkTime)
 {
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(1000);
   digitalWrite(LED_BUILTIN, HIGH);
-  delay(1000);
+  delay(blinkTime);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(blinkTime);
 }

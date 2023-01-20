@@ -75,3 +75,11 @@ The mklittlefs file in the root dir you have to [get](https://github.com/earleph
 If you have the Arduino IDE installed, you can borrow it from there too. On macOS you can find it here: `~/Library/Arduino15/packages/esp32/tools/mklittlefs/3.0.0-gnu12-dc7f933/mklittlefs`.  Help for setup the file system you can find [here](https://randomnerdtutorials.com/esp8266-nodemcu-vs-code-platformio-littlefs/). This project was created on macOS (silicon).
 
 [Support RTK2GO](http://new.rtk2go.com/donations-and-support/)
+
+### ESP32 board LED error codes:
+
+0.1 s       - BLE: not connected
+0.5 s       - RTK: setupGNSS() failed (I2C setup)
+1 s	        - RTK: setupGNSS() failed (I2C communication)
+2 s 	    - RTK: credentialsExists false
+1s:0.1s     - WiFi: connection to AP lost
