@@ -247,9 +247,7 @@ void task_bno_orientation_via_ble(void *pvParameters);
 void xQueueSetup(void);
 
 // Globals
-// WiFiClient ntripClient;
-
-void blinkOneTime(int blinkTime);
+WiFiClient ntripClient;
 
 void setup() 
 {
@@ -305,7 +303,7 @@ void setup()
   if (!setupGNSS()) 
   { 
     DBG.println("setupGNSS() failed! Freezing...");
-    while (true) blinkOneTime(1000);
+    while (true) {};
   };
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
@@ -369,7 +367,8 @@ bool setupGNSS()
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
       DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-      blinkOneTime(500);
+      // vTaskDelay(1000/portTICK_PERIOD_MS);
+      delay(500);
     }
 
     bool response = true;
@@ -479,10 +478,9 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   }
 
   // WiFi reconnect if fails
-  // const uint8_t kMaxAttempts = 2;
-  // uint8_t attempts = 0;
-
-  WiFiClient ntripClient;
+  const uint8_t kMaxAttempts = 2;
+  uint8_t attempts = 0;
+  // WiFiClient ntripClient;
   long rtcmCount = 0;
 
   while (true) // Task loop begins
@@ -499,14 +497,14 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         // First check WiFi connection
         while (checkConnectionToWifiStation() == false) 
         {
-          // attempts++;
+          attempts++;
           vTaskDelay(1000/portTICK_PERIOD_MS);
 
-          // if (attempts > kMaxAttempts) 
-          // {
-          //   setupWiFi(&server);
-          //   attempts = 0;
-          // }
+          if (attempts > kMaxAttempts) 
+          {
+            setupWiFi(&server);
+            attempts = 0;
+          }
         };
 
         DBG.print(F("Opening socket to "));
@@ -974,12 +972,4 @@ void buttonHandler(Button2 &btn)
     
     ESP.restart();
   }
-}
-
-void blinkOneTime(int blinkTime)
-{
-  digitalWrite(LED_BUILTIN, LOW);
-  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
-  digitalWrite(LED_BUILTIN, HIGH);
-  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
 }
