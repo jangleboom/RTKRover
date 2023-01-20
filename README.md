@@ -42,7 +42,7 @@ more information in the [datasheet](https://www.ceva-dsp.com/wp-content/uploads/
 
 ZED-F9P:
 
-If you are NOT using the web form of the RTKBaseManager, then to connect to a caster you will need to fill out the CasterSecrets.h that lives in your src folder with your own credentials (and replace the vars with the k prefixed values e. g: mountPoint --> kMountPoint in the main.cpp).
+If you are NOT using the web form of the RTKBaseManager, then to connect to a caster you will need to fill out the CasterSecrets.h that lives in your src folder with your own credentials (and replace the vars with the k prefixed values e. g: ```mountPoint``` to ```kMountPoint in the main.cpp).
 
 ````
 #ifndef CASTER_SECRETS_H
