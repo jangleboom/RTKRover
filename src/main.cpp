@@ -258,6 +258,9 @@ void setup()
   while (!Serial) {};
   #endif
 
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
  //===============================================================================
   // Initialize LittleFS
   // Use board_build.partitions in platformio.ini
@@ -314,8 +317,6 @@ void setup()
   DBG.println(" V");
 
   // wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
 
   // FreeRTOS
   mutexBus = xSemaphoreCreateMutex();
