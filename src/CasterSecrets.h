@@ -18,8 +18,5 @@ const char kCasterUserPw[] = "";                        // Not neccecary, more i
 
 // Device name 
 const char kDeviceName[] = "roverli";                   // E. g. 
-// Wifi access
-const char kWifiSsid[] = "YOUR_SSID_WITHOUT_SPACES";    // Wifi to connect the rover with
-const char kWifiPw[] = "YOUR_WIFI_PASSWORD";
 
 #endif /*** CASTER_SECRETS_H ***/
