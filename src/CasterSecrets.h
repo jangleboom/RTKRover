@@ -1,8 +1,11 @@
 #ifndef CASTER_SECRETS_H
 #define CASTER_SECRETS_H
-// A place for your caster credentials, this will be not used if you use the web form of the RTKRoverManager
-
-// RTK2Go http://www.rtk2go.com:2101/SNIP::STATUS#uptime
+/** A place for your caster credentials.
+ * Except of the empty kCasterUserPw[], this will be not used if 
+ * you use the web form of the RTKRoverManager for credential input.
+ * 
+ * Check if your base station is online: http://www.rtk2go.com:2101/SNIP::STATUS#uptime
+ */ 
 
 const char kCasterHost[] = "rtk2go.com"; 
 const char kCasterPort[] = "2101";
