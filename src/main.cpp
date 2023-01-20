@@ -978,7 +978,7 @@ void buttonHandler(Button2 &btn)
 void blinkOneTime(int blinkTime)
 {
   digitalWrite(LED_BUILTIN, LOW);
-  delay(blinkTime);
+  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
   digitalWrite(LED_BUILTIN, HIGH);
-  delay(blinkTime);
+  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
 }
