@@ -495,7 +495,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         while (checkConnectionToWifiStation() == false) 
         {
           // attempts++;
-          vTaskDelay(1000/portTICK_PERIOD_MS);
+          blinkOneTime(1000);
+          blinkOneTime(500);
 
           // if (attempts > kMaxAttempts) 
           // {
@@ -788,6 +789,8 @@ void task_send_rtk_position_via_ble(void *pvParameters)
   int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
+  while (!bleConnected) blinkOneTime(100);
+
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
   // DBG.print(F("task_send_rtk_position_via_ble setup, uxHighWaterMark: "));
@@ -842,13 +845,12 @@ void task_send_rtk_position_via_ble(void *pvParameters)
       // DBG.print(F("task_send_rtk_position_via_ble loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
-    } /*** while (bleConnected) ends ***/
-
-    if (!bleConnected) 
+    } /*** if (bleConnected) ends ***/
+    else
     {
-      DBG.println(F("BLE not connected"));
-      vTaskDelay(1000/portTICK_PERIOD_MS);
+      blinkOneTime(100);
     }
+ 
 
     vTaskDelay(TASK_RTK_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
     // taskYIELD();
@@ -976,8 +978,8 @@ void buttonHandler(Button2 &btn)
 
 void blinkOneTime(int blinkTime)
 {
-  digitalWrite(LED_BUILTIN, LOW);
-  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
   digitalWrite(LED_BUILTIN, HIGH);
-  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
+  delay(blinkTime);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(blinkTime);
 }
