@@ -78,8 +78,8 @@ If you have the Arduino IDE installed, you can borrow it from there too. On macO
 
 ### ESP32 board LED error codes:
 
-0.1 s       - BLE: not connected
-0.5 s       - RTK: setupGNSS() failed (I2C setup)
-1 s	        - RTK: setupGNSS() failed (I2C communication)
-2 s 	    - RTK: credentialsExists false
-1s:0.1s     - WiFi: connection to AP lost
+* 0.1 s BLE: not connected
+* 0.5 s RTK: setupGNSS() failed (I2C setup)
+* 1.0 s	RTK: setupGNSS() failed (I2C communication)
+* 2.0 s RTK: credentialsExists false
+* 1.0 s : 0.1 s WiFi: connection to AP lost
