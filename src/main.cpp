@@ -476,7 +476,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!credentialsExists) 
   {
     DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    while (true) { vTaskDelay(1000/portTICK_PERIOD_MS); };
+    blinkOneTime(2000);
   }
 
   // WiFi reconnect if fails
@@ -980,7 +980,7 @@ void buttonHandler(Button2 &btn)
 void blinkOneTime(int blinkTime)
 {
   digitalWrite(LED_BUILTIN, LOW);
-  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
+  delay(1000);
   digitalWrite(LED_BUILTIN, HIGH);
-  vTaskDelay(blinkTime/portTICK_PERIOD_MS);
+  delay(1000);
 }
