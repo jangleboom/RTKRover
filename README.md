@@ -42,7 +42,7 @@ more information in the [datasheet](https://www.ceva-dsp.com/wp-content/uploads/
 
 ZED-F9P:
 
-To connect to a caster you need to create a secrets.h file with your credentials that lives in your src folder and looks like this:
+If you are NOT using the web form of the RTKBaseManager, then to connect to a caster you will need to fill out the CasterSecrets.h that lives in your src folder with your own credentials (and replace the vars with the k prefixed values e. g: mountPoint --> kMountPoint in the main.cpp).
 
 ````
 #ifndef CASTER_SECRETS_H
@@ -66,8 +66,6 @@ const char kWifiPw[] = "YOUR_WIFI_PASSWORD";
 #endif /*** CASTER_SECRETS_H ***/
 
 ````
-
-If you are not using the web form of the RTKBaseManager, then you have to replace the dynamically read credentials with the constant ones (use the k prefixed values e. g: mountPoint --> kMountPoint) in the main.cpp.
 
 
 The mklittlefs file in the root dir you have to [get](https://github.com/earlephilhower/mklittlefs/releases) depending on your OS.
