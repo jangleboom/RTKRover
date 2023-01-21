@@ -252,6 +252,10 @@ void blinkOneTime(int blinkTime);
 
 void setup() 
 {
+  // Board LED used for error codes (written in README.md)
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
   #ifdef DEBUGGING
   Serial.begin(BAUD);
   while (!Serial) {};
@@ -308,8 +312,6 @@ void setup()
   DBG.println(" V");
 
   wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
 
   // FreeRTOS
   mutexBus = xSemaphoreCreateMutex();
