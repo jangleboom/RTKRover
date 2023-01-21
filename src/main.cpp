@@ -461,10 +461,10 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   UBaseType_t uxHighWaterMark; 
 
   // Read credentials
-  String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
-  String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
-  String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
-  String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
+  String casterHost = kCasterHost;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
+  String casterPort = kCasterPort;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
+  String casterUser = kCasterUser;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
+  String mountPoint =  kMountPoint;//readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
   String casterUserPW = kCasterUserPw; // No password needed, but it is defined in CasterSecrets.h
   
   // Check RTK credentials
