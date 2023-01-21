@@ -7,7 +7,7 @@ Hardware used:
 * Adafruit Feather ESP32 Huzzah 
 * SparkFun GPS-RTK-SMA Breakout - ZED-F9P (Qwiic)
 * SparkFun BNO080 Breakout
-* ublox ANN-MB1 antenna
+* ublox [ANN-MB1](https://www.u-blox.com/en/product/ann-mb-series?legacy=Current) antenna (the small one the picture is not used here at the moment)
 * LiPo battery
 * Push button(s)
 * Resistor 10 k
