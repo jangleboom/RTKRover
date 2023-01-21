@@ -253,13 +253,13 @@ void blinkOneTime(int blinkTime);
 
 void setup() 
 {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
   #ifdef DEBUGGING
   Serial.begin(BAUD);
   while (!Serial) {};
   #endif
-
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
 
  //===============================================================================
   // Initialize LittleFS
