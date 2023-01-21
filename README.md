@@ -35,6 +35,8 @@ In main.cpp line 763 (or near) you can choose the way of sensor fusion in the BN
   // bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);  
   // bno080.enableGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);  
   bno080.enableARVRStabilizedRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);
+  // bno080.enableARVRStabilizedGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);
+
 
 `````
 
