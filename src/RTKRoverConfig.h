@@ -12,7 +12,7 @@
 =================================================================================
 */
 
-// Set to true for debug output, false for no debug output
+// Set to true for debug mode, false for production mode
 #define DEBUGGING true 
 #define DBG \
   if (DEBUGGING) Serial
