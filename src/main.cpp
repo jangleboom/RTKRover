@@ -472,7 +472,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!credentialsExists) 
   {
     DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    while (true) { delay(1000); };
+    while (true) blinkOneTime(2000);
   }
 
   // WiFi reconnect if fails
