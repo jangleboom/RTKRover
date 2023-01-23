@@ -281,22 +281,6 @@ void setup()
 #endif
   //===============================================================================
  
-  setupWiFi(&server);
-
-  while (checkConnectionToWifiStation() == false)
-  {
-    DBG.println(F("Not connected to WiFi station"));
-    if (WiFi.getMode() == WIFI_AP) 
-    {
-      DBG.println(F("Enter Wifi credentials on webform:"));
-      DBG.print(F("Connect yor computer to SSID: "));
-      DBG.println(WiFi.getHostname());
-      DBG.print(F("Go with your Browser to IP: "));
-      DBG.println(WiFi.softAPIP());
-    }
-    delay(3000);
-  }
-
   setupBLE();
   setupBNO080();
  
