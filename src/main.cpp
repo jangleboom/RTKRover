@@ -524,7 +524,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         {
           blinkOneTime(1000, false);
           blinkOneTime(100, false);
-        };
+        }
 
         DBG.print(F("Opening socket to "));
         DBG.println(casterHost.c_str());
