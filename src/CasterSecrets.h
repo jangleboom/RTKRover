@@ -13,8 +13,8 @@ const char kCasterUserPw[] = "";                    // This can be added to the 
 const char kDeviceName[] = "rtkrover";
 const char kMountPoint[] = "rtkberlin";
 const char kCasterUser[] = "mr.markuese@gmail.com"; 
-const char kWifiSsid[] = "moinmoin";
-const char kWifiPw[] = "test1234";
+const char kWifiSsid[] = "Loewenzahn";
+const char kWifiPw[] = "vollverschluesselt1312!";
 // Wifi access
 // const char kWifiSsid[] = "ssid_without_spaces";
 // const char kWifiPw[] = "***";
