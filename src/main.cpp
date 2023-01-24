@@ -245,9 +245,6 @@ void task_bno_orientation_via_ble(void *pvParameters);
  */
 void xQueueSetup(void);
 
-// Globals
-// WiFiClient ntripClient;
-
 /**
  * @brief Function that blinks one time
  * 
