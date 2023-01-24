@@ -158,9 +158,8 @@ void setupBNO080(void);
                                 GNSS
 =================================================================================
 */
-long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
-bool beginPositioning = false;  // Wait with positioning for first correction data from caster
-
+long lastTime = 0;              // Simple local timer. Limits amount if I2C traffic to Ublox module.
+bool beginPositioning = false;  // Wait for first correction data from caster
 // The ESP32 core has a built in base64 library but not every platform does
 // We'll use an external lib if necessary.
 #if defined(ARDUINO_ARCH_ESP32)
@@ -246,13 +245,23 @@ void task_bno_orientation_via_ble(void *pvParameters);
  */
 void xQueueSetup(void);
 
-// Globals
-// WiFiClient ntripClient;
+/**
+ * @brief Function that blinks one time
+ * 
+ * @param blinkTime       Blink time in ms
+ * @param shouldNotBlock  Kind of delay between blinking
+ */
+void blinkOneTime(int blinkTime, bool shouldNotBlock);
 
-void blinkOneTime(int blinkTime);
+/**
+ * @brief Deletes WiFi station SSID and PW from LittleFS
+ * 
+ */
+void wipeWiFiCredentials(void);
 
 void setup() 
 {
+  // Board LED used for error codes (written in README.md)
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
@@ -270,53 +279,31 @@ void setup()
     if (!setupLittleFS()) while (true) {};
   }
 
+  // The following function clear the file system and that will cause a setup as AP to enter new data
+
   // Uncomment if you want to format (e. g after changing partition sizes)
   // (And dont forget to comment this again after one run ;)
   //formatLittleFS();
 
+  // wipeWiFiCredentials();  // Use this for deleting WiFi data only
   // wipeLittleFSFiles();  // Use this for deleting all data
 #ifdef DEBUGGING
   listFiles();
   delay(3000);
 #endif
+
   //===============================================================================
-  // Read Wifi credentials from header and save them into LittleFS, so the RTKRoverManger
-  // needs no API change for this special use case in Basel 01/2023
-  // (Reason: Users could accidentally press the wipe button)
-  writeFile(LittleFS, getPath(PARAM_WIFI_SSID).c_str(), kWifiSsid);
-  writeFile(LittleFS, getPath(PARAM_WIFI_PASSWORD).c_str(), kWifiPw);
-  writeFile(LittleFS, getPath(PARAM_DEVICE_NAME).c_str(), kDeviceName);
+  // Wifi setup AP or STATION, depending on data in LittleFS
   setupWiFi(&server);
-
-  while (checkConnectionToWifiStation() == false)
-  {
-    DBG.println(F("Not connected to WiFi station"));
-    if (WiFi.getMode() == WIFI_AP) 
-    {
-      DBG.println(F("Enter Wifi credentials on webform:"));
-      DBG.print(F("Connect yor computer to SSID: "));
-      DBG.println(WiFi.getHostname());
-      DBG.print(F("Go with your Browser to IP: "));
-      DBG.println(WiFi.softAPIP());
-    }
-    delay(3000);
-  }
-
   setupBLE();
   setupBNO080();
- 
-  if (!setupGNSS()) 
-  { 
-    DBG.println("setupGNSS() failed! Freezing...");
-    while (true) blinkOneTime(1000);
-  };
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   DBG.print(F("Battery: "));
   DBG.print(getBatteryVolts());  
   DBG.println(" V");
 
-  // wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
+  wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
 
   // FreeRTOS
   mutexBus = xSemaphoreCreateMutex();
@@ -341,6 +328,7 @@ void setup()
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
   DBG.println(thisBoard);
+  
 }
 
 void loop() 
@@ -349,7 +337,7 @@ void loop()
   aunit::TestRunner::run();
   #endif
 
-  // wipeButton.loop();
+  wipeButton.loop();
 }
 
 /*
@@ -370,7 +358,7 @@ bool setupGNSS()
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
       DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-      blinkOneTime(500);
+      blinkOneTime(500, false);
     }
 
     bool response = true;
@@ -426,7 +414,7 @@ void task_rtk_get_rover_position(void *pvParameters)
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
 
-  // Wait for first correction data
+  // Wait for first correction data<
   while ( ! beginPositioning) { vTaskDelay(1000/portTICK_PERIOD_MS); }
 
   while (true)
@@ -452,6 +440,19 @@ void task_rtk_get_corrrection_data(void *pvParameters)
 {
   (void)pvParameters;
 
+  if (!setupGNSS()) 
+  { 
+    DBG.println("setupGNSS() failed! Freezing...");
+    while (true) blinkOneTime(1000, false);
+  };
+
+  while ( ! checkConnectionToWifiStation() )
+  {
+    DBG.println(F("Not connected to WiFi station"));
+    blinkOneTime(1000, false);
+  }
+
+//=========================================================================
   // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
   long lastReceivedRTCM_ms = 0; 
   // If we fail to get a complete RTCM frame after 10s, then disconnect from caster
@@ -460,11 +461,11 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
 
-  // Read credentials
-  String casterHost = kCasterHost;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
-  String casterPort = kCasterPort;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
-  String casterUser = kCasterUser;//readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
-  String mountPoint =  kMountPoint;//readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
+  // Read RTK credentials
+  String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
+  String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
+  String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
+  String mountPoint =  readFile(LittleFS, getPath(PARAM_RTK_MOINT_POINT).c_str());
   String casterUserPW = kCasterUserPw; // No password needed, but it is defined in CasterSecrets.h
   
   // Check RTK credentials
@@ -477,12 +478,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!credentialsExists) 
   {
     DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    while (true) blinkOneTime(2000);
+    while (true) blinkOneTime(2000, false);
   }
-
-  // WiFi reconnect if fails
-  // const uint8_t kMaxAttempts = 2;
-  // uint8_t attempts = 0;
 
   WiFiClient ntripClient;
   long rtcmCount = 0;
@@ -499,17 +496,9 @@ void task_rtk_get_corrrection_data(void *pvParameters)
       if (ntripClient.connected() == false)
       {
         // First check WiFi connection
-        while (checkConnectionToWifiStation() == false) 
+        while ( ! checkConnectionToWifiStation() ) 
         {
-          // attempts++;
-          blinkOneTime(1000);
-          blinkOneTime(500);
-
-          // if (attempts > kMaxAttempts) 
-          // {
-          //   setupWiFi(&server);
-          //   attempts = 0;
-          // }
+          blinkOneTime(1000, false);
         };
 
         DBG.print(F("Opening socket to "));
@@ -765,11 +754,11 @@ void setupBNO080()
   }
     
   // Activate IMU functionalities
+  bno080.enableARVRStabilizedRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS); 
+  // bno080.enableARVRStabilizedGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);
   // bno080.enableRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);  
-  // bno080.enableGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS); 
-  // bno080.enableARVRStabilizedGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS); 
-  bno080.enableARVRStabilizedRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);   
-
+  // bno080.enableGameRotationVector(BNO080_ROT_VECT_UPDATE_RATE_MS);  
+  
   bno080.enableAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
   bno080.enableLinearAccelerometer(BNO080_LIN_ACCEL_UPDATE_RATE_MS);    
   // bno080.enableStepCounter(20);   // Thomas: Funktioniert sehr schlecht.. 
@@ -799,7 +788,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
   int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
-  while (!bleConnected) blinkOneTime(100);
+  while (!bleConnected) blinkOneTime(100, false);
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -858,7 +847,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
     } /*** if (bleConnected) ends ***/
     else
     {
-      blinkOneTime(100);
+      blinkOneTime(100, false);
     }
  
 
@@ -986,10 +975,16 @@ void buttonHandler(Button2 &btn)
   }
 }
 
-void blinkOneTime(int blinkTime)
+void wipeWiFiCredentials()
+{
+  clearPath(getPath(PARAM_WIFI_SSID).c_str());
+  clearPath(getPath(PARAM_WIFI_PASSWORD).c_str());
+}
+
+void blinkOneTime(int blinkTime, bool shouldNotBlock)
 {
   digitalWrite(LED_BUILTIN, HIGH);
-  delay(blinkTime);
+  shouldNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
   digitalWrite(LED_BUILTIN, LOW);
-  delay(blinkTime);
+  shouldNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
 }
