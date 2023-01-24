@@ -464,7 +464,10 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!setupGNSS()) 
   { 
     DBG.println("setupGNSS() failed! Freezing...");
-    while (true) blinkOneTime(1000, false);
+    while (true) 
+    {
+      blinkOneTime(1000, false);
+    }
   };
 
   while ( ! checkConnectionToWifiStation() )
@@ -520,6 +523,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         while ( ! checkConnectionToWifiStation() ) 
         {
           blinkOneTime(1000, false);
+          blinkOneTime(100, false);
         };
 
         DBG.print(F("Opening socket to "));
