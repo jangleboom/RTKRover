@@ -248,7 +248,7 @@ void xQueueSetup(void);
 // Globals
 // WiFiClient ntripClient;
 
-void blinkOneTime(int blinkTime);
+void blinkOneTime(int blinkTime, bool shouldNotBlock);
 
 void setup() 
 {
@@ -279,16 +279,19 @@ void setup()
   listFiles();
   delay(3000);
 #endif
+
   //===============================================================================
- 
+  // Wifi setup AP or STATION, depending on data in LittleFS
+  setupWiFi(&server);
+  while ( ! checkConnectionToWifiStation() )
+  {
+    DBG.println(F("Not connected to WiFi station"));
+    blinkOneTime(1000, false);
+  }
+  //===============================================================================
+
   setupBLE();
   setupBNO080();
- 
-  if (!setupGNSS()) 
-  { 
-    DBG.println("setupGNSS() failed! Freezing...");
-    while (true) blinkOneTime(1000);
-  };
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   DBG.print(F("Battery: "));
@@ -349,7 +352,7 @@ bool setupGNSS()
     while (myGNSS.begin(Wire1, RTK_I2C_ADDR) == false)
     {
       DBG.println(F("u-blox GNSS not detected at default I2C address. Please check wiring. Freezing loop."));
-      blinkOneTime(500);
+      blinkOneTime(500, false);
     }
 
     bool response = true;
@@ -431,6 +434,21 @@ void task_rtk_get_corrrection_data(void *pvParameters)
 {
   (void)pvParameters;
 
+  // setupWiFi(&server);
+
+  if (!setupGNSS()) 
+  { 
+    DBG.println("setupGNSS() failed! Freezing...");
+    while (true) blinkOneTime(1000, false);
+  };
+
+  while ( ! checkConnectionToWifiStation() )
+  {
+    DBG.println(F("Not connected to WiFi station"));
+    blinkOneTime(1000, false);
+  }
+
+//=========================================================================
   // 5 RTCM messages take approximately ~300ms to arrive at 115200bps
   long lastReceivedRTCM_ms = 0; 
   // If we fail to get a complete RTCM frame after 10s, then disconnect from caster
@@ -439,7 +457,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
 
-  // Read credentials
+  // Read RTK credentials
   String casterHost = readFile(LittleFS, getPath(PARAM_RTK_CASTER_HOST).c_str());
   String casterPort = readFile(LittleFS, getPath(PARAM_RTK_CASTER_PORT).c_str());
   String casterUser = readFile(LittleFS, getPath(PARAM_RTK_CASTER_USER).c_str());
@@ -456,7 +474,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!credentialsExists) 
   {
     DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    while (true) blinkOneTime(2000);
+    while (true) blinkOneTime(2000, false);
   }
 
   // WiFi reconnect if fails
@@ -481,9 +499,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         while (checkConnectionToWifiStation() == false) 
         {
           // attempts++;
-          blinkOneTime(1000);
-          blinkOneTime(500);
-
+          blinkOneTime(1000, false);
           // if (attempts > kMaxAttempts) 
           // {
           //   setupWiFi(&server);
@@ -778,7 +794,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
   int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
-  while (!bleConnected) blinkOneTime(100);
+  while (!bleConnected) blinkOneTime(100, false);
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -837,7 +853,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
     } /*** if (bleConnected) ends ***/
     else
     {
-      blinkOneTime(100);
+      blinkOneTime(100, false);
     }
  
 
@@ -965,10 +981,10 @@ void buttonHandler(Button2 &btn)
   }
 }
 
-void blinkOneTime(int blinkTime)
+void blinkOneTime(int blinkTime, bool shouldNotBlock)
 {
   digitalWrite(LED_BUILTIN, HIGH);
-  delay(blinkTime);
+  shouldNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
   digitalWrite(LED_BUILTIN, LOW);
-  delay(blinkTime);
+  shouldNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
 }
