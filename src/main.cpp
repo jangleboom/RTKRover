@@ -159,7 +159,7 @@ void setupBNO080(void);
 =================================================================================
 */
 long lastTime = 0;              // Simple local timer. Limits amount if I2C traffic to Ublox module.
-bool beginPositioning = false;  // Wait for first correction data from caster
+bool beginTracking = false;  // Wait for first correction data from caster
 // The ESP32 core has a built in base64 library but not every platform does
 // We'll use an external lib if necessary.
 #if defined(ARDUINO_ARCH_ESP32)
@@ -415,7 +415,7 @@ void task_rtk_get_rover_position(void *pvParameters)
   UBaseType_t uxHighWaterMark; 
 
   // Wait for first correction data<
-  while ( ! beginPositioning) { vTaskDelay(1000/portTICK_PERIOD_MS); }
+  while ( ! beginTracking) { vTaskDelay(1000/portTICK_PERIOD_MS); }
 
   while (true)
   {
@@ -647,7 +647,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
           if (xSemaphoreTake(mutexBus, portMAX_DELAY))
           {
             myGNSS.pushRawData(rtcmData, rtcmCount, false);
-            beginPositioning = true;
+            beginTracking = true;
             xSemaphoreGive(mutexBus);
           }
           DBG.print(F("RTCM pushed to ZED: "));
@@ -864,7 +864,7 @@ void task_bno_orientation_via_ble(void *pvParameters)
 {
     (void)pvParameters;
 
-    while (!bleConnected) 
+    while (!bleConnected || !beginTracking) 
     {
       DBG.println(F("Waiting for BLE connection"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
@@ -882,6 +882,7 @@ void task_bno_orientation_via_ble(void *pvParameters)
     // DBG.print(F("task_bno_orientation_via_ble setup, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
 
+    while (!beginTracking) {};
     while (true) 
     {
       // TODO: Separate reading values from sending values
@@ -961,7 +962,7 @@ void buttonHandler(Button2 &btn)
   if (btn == wipeButton) 
   {
     digitalWrite(LED_BUILTIN, HIGH);
-    
+    beginTracking = false;
     // Clear whole memory
     //DBG.println(F("Wiping whole memory..."));
     //wipeLittleFSFiles();
