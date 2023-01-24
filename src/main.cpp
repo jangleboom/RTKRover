@@ -248,7 +248,19 @@ void xQueueSetup(void);
 // Globals
 // WiFiClient ntripClient;
 
+/**
+ * @brief Function that blinks one time
+ * 
+ * @param blinkTime       Blink time in ms
+ * @param shouldNotBlock  Kind of delay between blinking
+ */
 void blinkOneTime(int blinkTime, bool shouldNotBlock);
+
+/**
+ * @brief Deletes WiFi station SSID and PW from LittleFS
+ * 
+ */
+void wipeWiFiCredentials(void);
 
 void setup() 
 {
@@ -270,11 +282,14 @@ void setup()
     if (!setupLittleFS()) while (true) {};
   }
 
+  // The following function clear the file system and that will cause a setup as AP to enter new data
+
   // Uncomment if you want to format (e. g after changing partition sizes)
   // (And dont forget to comment this again after one run ;)
   //formatLittleFS();
 
-  //wipeLittleFSFiles();  // Use this for deleting all data
+  // wipeWiFiCredentials();  // Use this for deleting WiFi data only
+  // wipeLittleFSFiles();  // Use this for deleting all data
 #ifdef DEBUGGING
   listFiles();
   delay(3000);
@@ -283,13 +298,6 @@ void setup()
   //===============================================================================
   // Wifi setup AP or STATION, depending on data in LittleFS
   setupWiFi(&server);
-  while ( ! checkConnectionToWifiStation() )
-  {
-    DBG.println(F("Not connected to WiFi station"));
-    blinkOneTime(1000, false);
-  }
-  //===============================================================================
-
   setupBLE();
   setupBNO080();
   
@@ -323,6 +331,7 @@ void setup()
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
   DBG.println(thisBoard);
+  
 }
 
 void loop() 
@@ -434,8 +443,6 @@ void task_rtk_get_corrrection_data(void *pvParameters)
 {
   (void)pvParameters;
 
-  // setupWiFi(&server);
-
   if (!setupGNSS()) 
   { 
     DBG.println("setupGNSS() failed! Freezing...");
@@ -477,10 +484,6 @@ void task_rtk_get_corrrection_data(void *pvParameters)
     while (true) blinkOneTime(2000, false);
   }
 
-  // WiFi reconnect if fails
-  // const uint8_t kMaxAttempts = 2;
-  // uint8_t attempts = 0;
-
   WiFiClient ntripClient;
   long rtcmCount = 0;
 
@@ -496,15 +499,9 @@ void task_rtk_get_corrrection_data(void *pvParameters)
       if (ntripClient.connected() == false)
       {
         // First check WiFi connection
-        while (checkConnectionToWifiStation() == false) 
+        while ( ! checkConnectionToWifiStation() ) 
         {
-          // attempts++;
           blinkOneTime(1000, false);
-          // if (attempts > kMaxAttempts) 
-          // {
-          //   setupWiFi(&server);
-          //   attempts = 0;
-          // }
         };
 
         DBG.print(F("Opening socket to "));
@@ -979,6 +976,12 @@ void buttonHandler(Button2 &btn)
     
     ESP.restart();
   }
+}
+
+void wipeWiFiCredentials()
+{
+  clearPath(getPath(PARAM_WIFI_SSID).c_str());
+  clearPath(getPath(PARAM_WIFI_PASSWORD).c_str());
 }
 
 void blinkOneTime(int blinkTime, bool shouldNotBlock)
