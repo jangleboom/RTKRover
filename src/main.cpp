@@ -469,15 +469,15 @@ void task_rtk_get_corrrection_data(void *pvParameters)
     DBG.println("setupGNSS() failed! Freezing...");
     while (true) 
     {
-      blinkOneTime(1000, false);
+      blinkOneTime(1000, true);
     }
   };
 
   while ( ! checkConnectionToWifiStation() )
   {
     DBG.println(F("task setup: Not connected to WiFi station"));
-    blinkOneTime(1000, false);
-    blinkOneTime(100, false);
+    blinkOneTime(1000, true);
+    blinkOneTime(100, true);
   }
 
 //=========================================================================
@@ -503,10 +503,10 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   credentialsExists &= !casterUser.isEmpty();
   credentialsExists &= !mountPoint.isEmpty();
 
-  if (!credentialsExists) 
+  while (!credentialsExists) 
   {
-    DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    while (true) blinkOneTime(2000, false);
+    DBG.println(F("RTK credentials incomplete!\nFreezing RTK task."));
+    blinkOneTime(2000, true);
   }
 
   WiFiClient ntripClient;
@@ -527,8 +527,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         while ( ! checkConnectionToWifiStation() ) 
         {
           DBG.println(F("task loop: Not connected to WiFi station"));
-          blinkOneTime(1000, false);
-          blinkOneTime(100, false);
+          blinkOneTime(1000, true);
+          blinkOneTime(100, true);
         }
 
         DBG.print(F("Opening socket to "));
@@ -819,7 +819,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
   int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
-  while (!bleConnected) blinkOneTime(100, false);
+  while (!bleConnected) blinkOneTime(100, true);
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -878,7 +878,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
     } /*** if (bleConnected) ends ***/
     else
     {
-      blinkOneTime(100, false);
+      blinkOneTime(100, true);
     }
  
 
