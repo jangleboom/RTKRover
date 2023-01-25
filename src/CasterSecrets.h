@@ -11,7 +11,7 @@ const char kCasterUser[] = "fhnwbasel@gmail.com";   // User must provide their o
 const char kCasterUserPw[] = "";                    // This can be added to the web form if you want to use a PW here, it's not neccecary
 
 // Device name 
-const char kDeviceName[] = "roverli";           
+const char kDeviceName[] = "rover123";           
 // Wifi access
 const char kWifiSsid[] = "YOUR_SSID_WITHOUT_SPACES"; // Wifi to connect the rover with
 const char kWifiPw[] = "YOUR_WIFI_PASSWORD";
