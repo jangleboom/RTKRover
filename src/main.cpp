@@ -158,8 +158,9 @@ void setupBNO080(void);
                                 GNSS
 =================================================================================
 */
-long lastTime = 0;              // Simple local timer. Limits amount if I2C traffic to Ublox module.
-bool beginTracking = false;  // Wait for first correction data from caster
+long lastTime = 0; //Simple local timer. Limits amount if I2C traffic to Ublox module.
+bool beginPositioning = false;  // Wait with positioning for first correction data from caster
+
 // The ESP32 core has a built in base64 library but not every platform does
 // We'll use an external lib if necessary.
 #if defined(ARDUINO_ARCH_ESP32)
@@ -206,7 +207,7 @@ typedef struct Coord
 
 const uint8_t QUEUE_SIZE = 2;
 xQueueHandle xQueueAccuracy, xQueueCoord;
-static xSemaphoreHandle mutexBus;
+static xSemaphoreHandle mutexSem;
 
 /**
  * @brief Task to get the correction data from the caster server
@@ -295,8 +296,31 @@ void setup()
   //===============================================================================
   // Wifi setup AP or STATION, depending on data in LittleFS
   setupWiFi(&server);
+  delay(1000);
+
+  while (WiFi.getMode() == WIFI_AP) 
+  {
+    DBG.println(F("Enter Wifi credentials on webform:"));
+    DBG.print(F("Connect your computer to SSID: "));
+    DBG.println(WiFi.getHostname());
+    DBG.print(F("Go with your Browser to IP: "));
+    DBG.println(WiFi.softAPIP());
+    blinkOneTime(1000, false);
+    blinkOneTime(100, false);
+  }
+  if (WiFi.getMode() == WIFI_STA) 
+  {
+    while (! WiFi.isConnected())
+    {
+      DBG.println(F("setup(): Try reconnect to WiFi station"));
+      WiFi.reconnect();
+      DBG.printf("WiFi state: %s", WiFi.isConnected() ? "connected" : "disconnected");
+      blinkOneTime(1000, false);
+      blinkOneTime(100, false);
+    }
+  }
+
   setupBLE();
-  setupBNO080();
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
   DBG.print(F("Battery: "));
@@ -306,7 +330,7 @@ void setup()
   wipeButton.setPressedHandler(buttonHandler); // Pull down method is done in wipeButton init
 
   // FreeRTOS
-  mutexBus = xSemaphoreCreateMutex();
+  mutexSem = xSemaphoreCreateMutex();
   xQueueSetup();
 /*  
   Stack sizes of the tasks. You have to measure the used size in the task (set a high value for first run) and 
@@ -328,7 +352,6 @@ void setup()
   String thisBoard = ARDUINO_BOARD;
   DBG.print(F("Setup done on "));
   DBG.println(thisBoard);
-  
 }
 
 void loop() 
@@ -414,12 +437,12 @@ void task_rtk_get_rover_position(void *pvParameters)
   // Measure stack size
   UBaseType_t uxHighWaterMark; 
 
-  // Wait for first correction data<
-  while ( ! beginTracking) { vTaskDelay(1000/portTICK_PERIOD_MS); }
+  // Wait for first correction data
+  while ( ! beginPositioning) { vTaskDelay(1000/portTICK_PERIOD_MS); }
 
   while (true)
   {
-    if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+    if (xSemaphoreTake(mutexSem, portMAX_DELAY))
     {
       updatePosition();
 
@@ -428,7 +451,7 @@ void task_rtk_get_rover_position(void *pvParameters)
       // DBG.print(F("task_rtk_get_rover_position loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
 
-      xSemaphoreGive(mutexBus);
+      xSemaphoreGive(mutexSem);
     }
    
     vTaskDelay(TASK_RTK_GET_POSITION_INTERVAL_MS/portTICK_PERIOD_MS);
@@ -443,13 +466,17 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   if (!setupGNSS()) 
   { 
     DBG.println("setupGNSS() failed! Freezing...");
-    while (true) blinkOneTime(1000, false);
+    while (true) 
+    {
+      blinkOneTime(1000, true);
+    }
   };
 
   while ( ! checkConnectionToWifiStation() )
   {
-    DBG.println(F("Not connected to WiFi station"));
-    blinkOneTime(1000, false);
+    DBG.println(F("task setup: Not connected to WiFi station"));
+    blinkOneTime(1000, true);
+    blinkOneTime(100, true);
   }
 
 //=========================================================================
@@ -475,10 +502,10 @@ void task_rtk_get_corrrection_data(void *pvParameters)
   credentialsExists &= !casterUser.isEmpty();
   credentialsExists &= !mountPoint.isEmpty();
 
-  if (!credentialsExists) 
+  while (!credentialsExists) 
   {
-    DBG.println(F("RTK credentials incomplete, please fill out the web form and reboot!\nFreezing RTK task."));
-    while (true) blinkOneTime(2000, false);
+    DBG.println(F("RTK credentials incomplete!\nFreezing RTK task."));
+    blinkOneTime(2000, true);
   }
 
   WiFiClient ntripClient;
@@ -498,8 +525,9 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         // First check WiFi connection
         while ( ! checkConnectionToWifiStation() ) 
         {
-          blinkOneTime(1000, false);
-          blinkOneTime(100, false);
+          DBG.println(F("task loop: Not connected to WiFi station"));
+          blinkOneTime(1000, true);
+          blinkOneTime(100, true);
         }
 
         DBG.print(F("Opening socket to "));
@@ -601,7 +629,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
               connectionSuccess = true;
             if (strstr(response, "401") > 0) // Look for '401 Unauthorized'
             {
-              DBG.println(F("Hey - your credentials look bad! Check you caster username and password."));
+              DBG.println(F("Your credentials look bad!\nCheck you caster username, password and ban status (got email from rtk2go?)"));
               connectionSuccess = false;
             }
           }
@@ -644,18 +672,19 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         if (rtcmCount > 0)
         {
           //Push RTCM to GNSS module over I2C
-          if (xSemaphoreTake(mutexBus, portMAX_DELAY))
+          if (xSemaphoreTake(mutexSem, portMAX_DELAY))
           {
             myGNSS.pushRawData(rtcmData, rtcmCount, false);
-            beginTracking = true;
-            xSemaphoreGive(mutexBus);
+            beginPositioning = true;
+            xSemaphoreGive(mutexSem);
+            DBG.print(F("RTCM pushed to ZED: "));
+            DBG.println(rtcmCount);
+            uint32_t currentTime = millis();
+            DBG.print(F("Last data before ms: "));
+            DBG.println(currentTime - lastReceivedRTCM_ms);
+            lastReceivedRTCM_ms = currentTime;
           }
-          DBG.print(F("RTCM pushed to ZED: "));
-          DBG.println(rtcmCount);
-          uint32_t currentTime = millis();
-          DBG.print(F("Last data before ms: "));
-          DBG.println(currentTime - lastReceivedRTCM_ms);
-          lastReceivedRTCM_ms = currentTime;
+
           
           // updatePosition(); //This is done now in a dedicated task
         }
@@ -673,7 +702,7 @@ void task_rtk_get_corrrection_data(void *pvParameters)
       // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
       // DBG.print(F("task_rtk_get_corrrection_data loop, uxHighWaterMark: "));
       // DBG.println(uxHighWaterMark);
-    // } /*** End if (xSemaphoreTake(mutexBus, portMAX_DELAY)) ***/
+    // } /*** End if (xSemaphoreTake(mutexSem, portMAX_DELAY)) ***/
     
     task_end:
     
@@ -789,7 +818,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
   int32_t lat, lon, accuracy;
   int8_t latHp, lonHp;
 
-  while (!bleConnected) blinkOneTime(100, false);
+  while (!bleConnected) blinkOneTime(100, true);
 
   UBaseType_t uxHighWaterMark;
   // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -848,7 +877,7 @@ void task_send_rtk_position_via_ble(void *pvParameters)
     } /*** if (bleConnected) ends ***/
     else
     {
-      blinkOneTime(100, false);
+      blinkOneTime(100, true);
     }
  
 
@@ -864,12 +893,14 @@ void task_bno_orientation_via_ble(void *pvParameters)
 {
     (void)pvParameters;
 
-    while (!bleConnected || !beginTracking) 
+    while (!bleConnected) 
     {
-      DBG.println(F("Waiting for BLE connection"));
+      DBG.println(F("BNO tasks setup: Open RWA to connect BLE"));
       vTaskDelay(1000/portTICK_PERIOD_MS);
     }
-    
+
+    setupBNO080();
+
     float quatI, quatJ, quatK, quatReal, yawDegreeF, pitchDegreeF, linAccelZF;// rollDegreeF;
     int pitchDegree, yawDegree;// rollDegree;
     String dataStr((char *)0);
@@ -882,57 +913,64 @@ void task_bno_orientation_via_ble(void *pvParameters)
     // DBG.print(F("task_bno_orientation_via_ble setup, uxHighWaterMark: "));
     // DBG.println(uxHighWaterMark);
 
-    while (!beginTracking) {};
     while (true) 
     {
-      // TODO: Separate reading values from sending values
-      if (bno080.dataAvailable()) 
-      {         
-        quatI = bno080.getQuatI();
-        quatJ = bno080.getQuatJ();
-        quatK = bno080.getQuatK();
-        quatReal = bno080.getQuatReal();       
+      if (!bleConnected) 
+      {
+        DBG.println(F("BNO tasks loop: Please connect BLE"));
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+      }
+      else 
+      {
+        // TODO: Separate reading values from sending values
+        if (bno080.dataAvailable()) 
+        {         
+          quatI = bno080.getQuatI();
+          quatJ = bno080.getQuatJ();
+          quatK = bno080.getQuatK();
+          quatReal = bno080.getQuatReal();       
 
-        imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
-        quat.normalize();
-        imu::Vector<3> q_to_euler = quat.toEuler();     
-        yawDegreeF = q_to_euler.x();
-        yawDegreeF = yawDegreeF * -180.0 / M_PI;   // conversion to Degree
-            
-        if ( yawDegreeF < 0 ) yawDegreeF += 359.0; // convert negative to positive angles
-        
-        yawDegree = (int)(round(yawDegreeF));  
-        
-        pitchDegreeF = q_to_euler.z();
-        pitchDegreeF = pitchDegreeF * -180.0 / M_PI;
-        pitchDegree = (int)(round(pitchDegreeF));
+          imu::Quaternion quat = imu::Quaternion(quatReal, quatI, quatJ, quatK);
+          quat.normalize();
+          imu::Vector<3> q_to_euler = quat.toEuler();     
+          yawDegreeF = q_to_euler.x();
+          yawDegreeF = yawDegreeF * -180.0 / M_PI;   // conversion to Degree
+              
+          if ( yawDegreeF < 0 ) yawDegreeF += 359.0; // convert negative to positive angles
+          
+          yawDegree = (int)(round(yawDegreeF));  
+          
+          pitchDegreeF = q_to_euler.z();
+          pitchDegreeF = pitchDegreeF * -180.0 / M_PI;
+          pitchDegree = (int)(round(pitchDegreeF));
 
-        // rollDegreeF = q_to_euler.y();
-        // rollDegreeF = rollDegreeF * -180.0 / M_PI;
-        // rollDegree = (int)(round(rollDegreeF));
+          // rollDegreeF = q_to_euler.y();
+          // rollDegreeF = rollDegreeF * -180.0 / M_PI;
+          // rollDegree = (int)(round(rollDegreeF));
 
-        // Seems to be much slower than bno080.getAccelZ()
-        linAccelZF = bno080.getLinAccelZ();  
+          // Seems to be much slower than bno080.getAccelZ()
+          linAccelZF = bno080.getLinAccelZ();  
 
-        dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
-                + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
-        pHeadtrackerCharacteristic->setValue(dataStr.c_str());
-        pHeadtrackerCharacteristic->notify();
-        // DBG.println(linAccelZF);      
-        } 
-        else 
-        {
-          DBG.println(F("Waiting for BNO080 dataAvailable"));
-          vTaskDelay(1000/portTICK_PERIOD_MS);
+          dataStr = String(yawDegree) + DATA_STR_DELIMITER + String(pitchDegree) \
+                  + DATA_STR_DELIMITER + String(linAccelZF, LIN_ACCEL_Z_DECIMAL_DIGITS);
+          pHeadtrackerCharacteristic->setValue(dataStr.c_str());
+          pHeadtrackerCharacteristic->notify();
+          // DBG.println(linAccelZF);      
+          } 
+          else 
+          {
+            DBG.println(F("Ready for BNO080 dataAvailable"));
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+          }
+          // Measure stack size
+          // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+          // DBG.print(F("task_bno_orientation_via_ble loop, uxHighWaterMark: "));
+          // DBG.println(uxHighWaterMark);
+
         }
-        // Measure stack size
-        // uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        // DBG.print(F("task_bno_orientation_via_ble loop, uxHighWaterMark: "));
-        // DBG.println(uxHighWaterMark);
-
         vTaskDelay(TASK_BNO_ORIENTATION_VIA_BLE_INTERVAL_MS/portTICK_PERIOD_MS);
         // taskYIELD(); // 11.25 ms is the BLE connection interval, makes no sense to try to send faster
-    }
+     }
     // Delete self task
     vTaskDelete(NULL);
 
@@ -962,7 +1000,7 @@ void buttonHandler(Button2 &btn)
   if (btn == wipeButton) 
   {
     digitalWrite(LED_BUILTIN, HIGH);
-    beginTracking = false;
+    
     // Clear whole memory
     //DBG.println(F("Wiping whole memory..."));
     //wipeLittleFSFiles();
