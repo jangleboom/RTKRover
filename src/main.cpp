@@ -531,8 +531,8 @@ void task_rtk_get_corrrection_data(void *pvParameters)
         while ( ! checkConnectionToWifiStation() ) 
         {
           DBG.println(F("task loop: Not connected to WiFi station"));
-          blinkOneTime(1000, true);
-          blinkOneTime(100, true);
+          blinkOneTime(1000, false);
+          blinkOneTime(100, false);
         }
 
         DBG.print(F("Opening socket to "));
