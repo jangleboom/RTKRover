@@ -465,10 +465,14 @@ void task_rtk_get_corrrection_data(void *pvParameters)
 
   if (!setupGNSS()) 
   { 
-    DBG.println("setupGNSS() failed! Freezing...");
+    DBG.println("setupGNSS() failed! Restart in 10 s");
     while (true) 
     {
+      static const int timeToReboot = 10000;
+      static int counter = 0;
       blinkOneTime(1000, true);
+      counter++;
+      if (counter > 5) ESP.restart();
     }
   };
 
