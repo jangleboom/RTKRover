@@ -304,21 +304,26 @@ void setup()
   setupWiFi(&server);
   delay(1000);
   // while ( ! checkConnectionToWifiStation() )
-  while (! WiFi.isConnected())
+  while (WiFi.getMode() == WIFI_AP) 
   {
-    DBG.println(F("setup(): Not connected to WiFi station"));
-    DBG.printf("WiFi state: %d", WiFi.isConnected());
-    if (WiFi.getMode() == WIFI_AP) 
-    {
-      DBG.println(F("Enter Wifi credentials on webform:"));
-      DBG.print(F("Connect yor computer to SSID: "));
-      DBG.println(WiFi.getHostname());
-      DBG.print(F("Go with your Browser to IP: "));
-      DBG.println(WiFi.softAPIP());
-    }
+    DBG.println(F("Enter Wifi credentials on webform:"));
+    DBG.print(F("Connect your computer to SSID: "));
+    DBG.println(WiFi.getHostname());
+    DBG.print(F("Go with your Browser to IP: "));
+    DBG.println(WiFi.softAPIP());
     blinkOneTime(1000, false);
     blinkOneTime(100, false);
-    setupWiFi(&server);
+  }
+  if (WiFi.getMode() == WIFI_STA) 
+  {
+    while (! WiFi.isConnected())
+    {
+      DBG.println(F("setup(): Try reconnect to WiFi station"));
+      WiFi.reconnect();
+      DBG.printf("WiFi state: %s", WiFi.isConnected() ? "connected" : "disconnected");
+      blinkOneTime(1000, false);
+      blinkOneTime(100, false);
+    }
   }
 
   setupBLE();
