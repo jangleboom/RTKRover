@@ -250,9 +250,9 @@ void xQueueSetup(void);
  * @brief Function that blinks one time
  * 
  * @param blinkTime       Blink time in ms
- * @param shouldNotBlock  Kind of delay between blinking
+ * @param doNotBlock  Kind of delay between blinking
  */
-void blinkOneTime(int blinkTime, bool shouldNotBlock);
+void blinkOneTime(int blinkTime, bool doNotBlock);
 
 /**
  * @brief Deletes WiFi station SSID and PW from LittleFS
@@ -319,7 +319,8 @@ void setup()
       blinkOneTime(100, false);
     }
   }
-
+//===============================================================================
+  
   setupBLE();
   
   DBG.print(F("Device type: ")); DBG.println(DEVICE_TYPE);
@@ -1025,10 +1026,10 @@ void wipeWiFiCredentials()
   clearPath(getPath(PARAM_WIFI_PASSWORD).c_str());
 }
 
-void blinkOneTime(int blinkTime, bool shouldNotBlock)
+void blinkOneTime(int blinkTime, bool doNotBlock)
 {
   digitalWrite(LED_BUILTIN, HIGH);
-  shouldNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
+  doNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
   digitalWrite(LED_BUILTIN, LOW);
-  shouldNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
+  doNotBlock ? vTaskDelay(blinkTime) : delay(blinkTime);
 }
